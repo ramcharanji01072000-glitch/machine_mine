@@ -461,10 +461,18 @@ router.get(
 
 router.post(
   '/settings',
+  upload.single('logo'),
   wrap(async (req, res) => {
     const pct = (v) => Math.min(100, Math.max(0, Number(v) || 0));
     const money = (v) => Math.max(0, toPaise(v) || 0);
     const s = await Setting.get();
+    if (req.file) {
+      removeUpload(s.logo);
+      s.logo = publicPath(req.file);
+    } else if (req.body.removeLogo === 'on') {
+      removeUpload(s.logo);
+      s.logo = undefined;
+    }
     Object.assign(s, {
       aboutUs: str(req.body.aboutUs),
       androidLink: str(req.body.androidLink),

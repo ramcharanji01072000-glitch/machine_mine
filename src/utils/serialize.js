@@ -104,10 +104,15 @@ function carousel(c) {
 function appInfo(s) {
   return {
     id: 1,
+    logo: s.logo || null,
     android_link: s.androidLink || null,
     ios_link: s.iosLink || null,
     about_us: s.aboutUs || '',
     telegram: s.telegram || null,
+    referral_level1: s.referralLevel1,
+    referral_level2: s.referralLevel2,
+    referral_level3: s.referralLevel3,
+    min_withdraw: fmt(s.minWithdrawPaise),
     created_at: iso(s.createdAt),
   };
 }

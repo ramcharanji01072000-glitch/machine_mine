@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const schema = new mongoose.Schema(
   {
     _id: { type: String, default: 'app' },
+    logo: String, // /uploads/... path, shown on the app's splash, login and about screens
     androidLink: String,
     iosLink: String,
     aboutUs: { type: String, default: '' },
