@@ -1,75 +1,96 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#16181d">
+  <meta name="theme-color" content="#060a13">
   <title><%= title %> · MachineMine Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    body { background: #f5f6f8; }
-    /* Bootstrap's .offcanvas-lg forces a transparent background on large screens; keep it dark. */
-    nav.sidebar, nav.sidebar.offcanvas-lg { background-color: #16181d !important; }
-    .sidebar .nav-link { color: #b8bcc6; padding: 11px 20px; border-left: 3px solid transparent; border-radius: 0; }
-    .sidebar .nav-link:hover { color: #fff; background: #1f2229; }
-    .sidebar .nav-link.active { color: #fff; background: #1f2229; border-left-color: #dc3545; }
-    .brand { color: #fff; font-weight: 700; font-size: 18px; text-decoration: none; }
-    .stat { font-size: 1.6rem; font-weight: 600; }
-    .table td, .table th { vertical-align: middle; white-space: nowrap; }
-    .thumb { width: 56px; height: 40px; object-fit: cover; border-radius: 4px; background: #e9ecef; }
-    .mobile-bar { background: #16181d; position: sticky; top: 0; z-index: 1030; }
-
-    /* Desktop: fixed-width sidebar that stays in view. */
-    @media (min-width: 992px) {
-      .sidebar { width: 230px; min-height: 100vh; position: sticky; top: 0; align-self: flex-start; height: 100vh; overflow-y: auto; }
-    }
-
-    /* Phones: tables turn into stacked cards; labels come from the header (see footer script). */
-    @media (max-width: 767.98px) {
-      .stat { font-size: 1.3rem; }
-      h4.page-title { font-size: 1.2rem; }
-      .table-stack thead { display: none; }
-      .table-stack, .table-stack tbody, .table-stack tr, .table-stack td { display: block; width: 100%; }
-      .table-stack tr { padding: 10px 14px; border-bottom: 1px solid #e9ecef; }
-      .table-stack tr:last-child { border-bottom: 0; }
-      /* Label floats left; the value (which may span several lines) stays grouped on the right. */
-      .table-stack td { border: 0 !important; padding: 4px 0 !important; white-space: normal; text-align: right !important;
-                        max-width: none !important; overflow: hidden; word-break: break-word; }
-      .table-stack td::before { content: attr(data-label); float: left; margin-right: 12px; color: #6c757d; font-size: .8rem; line-height: 1.6; }
-      .table-stack td[data-label=""]::before, .table-stack td[colspan]::before { content: none; }
-      .table-stack td[data-label=""] { text-align: left !important; }
-      .table-stack td[colspan] { text-align: center !important; }
-      .table-stack td.text-truncate { text-overflow: clip; }
-      .table-stack td form { margin-top: 4px; }
-      .btn-sm { padding: .35rem .7rem; }
-    }
-  </style>
+  <%- include('theme') %>
 </head>
 <body>
-<% const nav = [['/', 'Dashboard'], ['/users', 'Users'], ['/products', 'Products'], ['/purchases', 'Purchases'], ['/withdrawals', 'Withdrawals'], ['/transactions', 'Transactions'], ['/carousel', 'Carousel'], ['/settings', 'Settings']]; %>
+<div class="orbs" aria-hidden="true"><span class="orb orb-blue"></span><span class="orb orb-gold"></span><span class="orb orb-cyan"></span></div>
+<%
+  const sections = [
+    ['Overview', [['/', 'Dashboard', 'grid'], ['/users', 'Users', 'users']]],
+    ['Money', [['/withdrawals', 'Withdrawals', 'out', pendingWithdrawals], ['/transactions', 'Transactions', 'list'], ['/purchases', 'Purchases', 'bag']]],
+    ['Content', [['/products', 'Machines', 'box'], ['/carousel', 'Banners', 'image']]],
+  ];
+  const icons = {
+    grid: '<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>',
+    users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7"/><path d="M18 14.7c1.9.7 3.1 2.6 3.5 5.3"/>',
+    out: '<rect x="2.5" y="6" width="19" height="13" rx="3"/><path d="M2.5 10.5h19"/><path d="M15 3l2 3"/><path d="M7 15h4"/>',
+    list: '<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/>',
+    bag: '<path d="M5 8h14l-1.2 11.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/>',
+    box: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+    image: '<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
+    gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+    logout: '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l5-5-5-5M15 12H3"/>',
+  };
+  const svg = (k) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${icons[k]}</svg>`;
+  const isActive = (href) => (href === '/' ? path === '/' : path.startsWith(href));
+%>
 
 <!-- Phone/tablet top bar -->
-<header class="mobile-bar d-flex d-lg-none align-items-center px-3 py-2">
-  <button class="btn btn-sm btn-outline-light me-3" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebar" aria-controls="sidebar" aria-label="Open menu">☰</button>
-  <a href="/admin" class="brand">⛏ MachineMine</a>
+<header class="mobile-bar d-flex d-lg-none align-items-center gap-3 px-3 py-2">
+  <button class="icon-btn" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebar" aria-controls="sidebar" aria-label="Open menu">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+  </button>
+  <a href="/admin" class="brand-sm">MachineMine</a>
+  <% if (pendingWithdrawals) { %><a href="/admin/withdrawals" class="ms-auto pill-badge"><%= pendingWithdrawals %> pending</a><% } %>
 </header>
 
-<div class="d-lg-flex">
+<div class="shell d-lg-flex">
   <nav id="sidebar" class="sidebar offcanvas-lg offcanvas-start flex-shrink-0" tabindex="-1" aria-label="Admin menu">
-    <div class="d-flex align-items-center justify-content-between px-3 py-3">
-      <a href="/admin" class="brand">⛏ MachineMine</a>
-      <button type="button" class="btn-close btn-close-white d-lg-none" data-bs-dismiss="offcanvas" data-bs-target="#sidebar" aria-label="Close"></button>
-    </div>
-    <div class="nav flex-column">
-      <% nav.forEach(([href, label]) => { const active = href === '/' ? path === '/' : path.startsWith(href); %>
-        <a href="/admin<%= href === '/' ? '' : href %>" class="nav-link <%= active ? 'active' : '' %>"><%= label %></a>
+    <div class="sidebar-inner">
+      <div class="d-flex align-items-center gap-2 mb-4">
+        <div class="logo-mark">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4.5 19 9l-9.5 9.5H5v-4.5z"/><path d="M12.5 6.5l5 5"/></svg>
+        </div>
+        <div class="lh-sm">
+          <div class="brand">MachineMine</div>
+          <div class="brand-sub">Admin console</div>
+        </div>
+        <button type="button" class="btn-close btn-close-white ms-auto d-lg-none" data-bs-dismiss="offcanvas" data-bs-target="#sidebar" aria-label="Close"></button>
+      </div>
+
+      <% sections.forEach(([heading, items]) => { %>
+        <div class="nav-heading"><%= heading %></div>
+        <% items.forEach(([href, label, icon, badge]) => { %>
+          <a href="/admin<%= href === '/' ? '' : href %>" class="side-link <%= isActive(href) ? 'active' : '' %>">
+            <%- svg(icon) %><span><%= label %></span>
+            <% if (badge) { %><span class="count"><%= badge %></span><% } %>
+          </a>
+        <% }) %>
       <% }) %>
+
+      <div class="mt-auto pt-4">
+        <a href="/admin/settings" class="side-link <%= isActive('/settings') ? 'active' : '' %>"><%- svg('gear') %><span>Settings</span></a>
+        <div class="admin-card mt-3">
+          <div class="avatar"><%= admin.username.slice(0, 2).toUpperCase() %></div>
+          <div class="lh-sm overflow-hidden">
+            <div class="fw-semibold text-truncate"><%= admin.username %></div>
+            <div class="small text-muted-2">Administrator</div>
+          </div>
+          <form method="post" action="/admin/logout" class="ms-auto">
+            <button class="icon-btn" title="Log out" aria-label="Log out"><%- svg('logout') %></button>
+          </form>
+        </div>
+      </div>
     </div>
-    <form method="post" action="/admin/logout" class="px-3 mt-3 pb-4">
-      <button class="btn btn-sm btn-outline-light w-100">Logout (<%= admin.username %>)</button>
-    </form>
   </nav>
-  <main class="flex-grow-1 p-3 p-md-4" style="min-width:0">
-    <h4 class="mb-3 page-title"><%= title %></h4>
+
+  <main class="flex-grow-1 main" style="min-width:0">
+    <div class="page-head">
+      <% if (path === '/') { %>
+        <h1 class="page-title"><%= greeting %>, <%= admin.username %></h1>
+        <div class="page-sub"><span class="live-dot"></span><%= today %> · Dashboard</div>
+      <% } else { %>
+        <h1 class="page-title"><%= title %></h1>
+        <div class="page-sub"><%= today %></div>
+      <% } %>
+    </div>
     <% if (flash.ok) { %><div class="alert alert-success py-2"><%= flash.ok %></div><% } %>
     <% if (flash.err) { %><div class="alert alert-danger py-2"><%= flash.err %></div><% } %>

@@ -1,43 +1,238 @@
 <%- include('partials/header', { title: 'Dashboard' }) %>
-<% const cards = [
-  ['Total users', stats.users, `+${stats.usersToday} today`, '/admin/users'],
-  ['Wallet balances (liability)', '₹' + fmt(stats.walletTotal), 'sum of all user balances', '/admin/users'],
-  ['Pending withdrawals', stats.pending, '₹' + fmt(stats.pendingAmount) + ' awaiting', '/admin/withdrawals'],
-  ['Active purchases', stats.activePurchases, 'not yet expired', '/admin/purchases?state=active'],
-  ['Total recharge', '₹' + fmt(stats.rechargeTotal), '₹' + fmt(stats.rechargeToday) + ' today', '/admin/transactions?mode=Recharge'],
-  ['Product sales', '₹' + fmt(stats.buyTotal), 'all time', '/admin/transactions?mode=Buy'],
-  ['Earnings collected', '₹' + fmt(stats.collectTotal), 'paid to wallets', '/admin/transactions?mode=Collect'],
-  ['Withdrawals paid', '₹' + fmt(stats.paidOut), 'approved', '/admin/withdrawals?status=approved'],
-]; %>
-<div class="row g-3 mb-4">
-  <% cards.forEach(([label, value, sub, href]) => { %>
-  <div class="col-6 col-lg-3">
-    <a href="<%= href %>" class="card h-100 text-decoration-none text-body"><div class="card-body">
-      <div class="text-muted small"><%= label %></div>
-      <div class="stat"><%= value %></div>
-      <div class="small text-muted"><%= sub %></div>
-    </div></a>
+<%
+  const money = (p) => '₹' + Number((p || 0) / 100).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+  const rupees = (r) => '₹' + Number(r || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+  const initials = (n) => (n || '?').split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+  const maxAct = Math.max(1, ...activity);
+  const ring = 2 * Math.PI * 54;
+%>
+<style>
+  .kpi-strip { display: grid; grid-template-columns: repeat(4, 1fr); }
+  .kpi { padding: 20px 22px; border-right: 1px solid var(--line); }
+  .kpi:last-child { border-right: 0; }
+  .kpi-label { color: var(--muted); font-size: .8rem; font-weight: 500; }
+  .kpi-value { font-size: 1.85rem; font-weight: 800; letter-spacing: -.03em; margin: 4px 0 6px; }
+  .delta { font-size: .72rem; font-weight: 700; padding: 3px 7px; border-radius: 7px; margin-right: 6px; }
+  .delta.up { color: #4ade80; background: rgba(34, 197, 94, .14); }
+  .delta.down { color: #f87171; background: rgba(239, 68, 68, .14); }
+  .delta.flat { color: var(--muted); background: rgba(255, 255, 255, .06); }
+  .vs { color: var(--muted); font-size: .76rem; }
+  .seg { display: inline-flex; padding: 4px; border-radius: 14px; background: rgba(255, 255, 255, .04); border: 1px solid var(--line); }
+  .seg a { padding: 6px 13px; border-radius: 10px; color: var(--muted); font-size: .8rem; font-weight: 600; }
+  .seg a.on { background: rgba(255, 255, 255, .1); color: #fff; }
+  .legend-dot { width: 9px; height: 9px; border-radius: 3px; display: inline-block; margin-right: 6px; }
+  .panel-title { font-weight: 700; font-size: 1.02rem; letter-spacing: -.01em; }
+  .panel-sub { color: var(--muted); font-size: .8rem; }
+  .row-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .row-item:last-child { border-bottom: 0; }
+  .chip-avatar { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-size: .72rem; font-weight: 700; flex-shrink: 0;
+    background: rgba(245, 158, 11, .16); color: #fbbf24; }
+  .mini-bar { height: 6px; border-radius: 4px; background: rgba(255, 255, 255, .07); overflow: hidden; width: 70px; }
+  .mini-bar > span { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+  .flow-bar { display: flex; gap: 4px; height: 12px; border-radius: 8px; overflow: hidden; }
+  .flow-bar span { border-radius: 4px; }
+  .bars { display: flex; align-items: flex-end; gap: 4px; height: 64px; }
+  .bars span { flex: 1; border-radius: 4px 4px 2px 2px; background: linear-gradient(180deg, #3b86ff, #1d4fb8); min-height: 4px; opacity: .9; }
+  .goal-card { position: relative; overflow: hidden; }
+  .goal-card::before { content: ''; position: absolute; inset: -40% -30% auto auto; width: 260px; height: 260px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(245, 158, 11, .28), transparent 65%); pointer-events: none; }
+  @media (max-width: 991.98px) {
+    .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+    .kpi:nth-child(2) { border-right: 0; }
+    .kpi:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+  }
+  @media (max-width: 767.98px) { .kpi { padding: 16px; } .kpi-value { font-size: 1.4rem; } }
+</style>
+
+<div class="row g-4">
+  <!-- Left: KPIs + chart -->
+  <div class="col-xl-9">
+    <div class="card mb-4">
+      <div class="kpi-strip">
+        <% kpis.forEach((k) => { const cls = k.delta > 0 ? 'up' : k.delta < 0 ? 'down' : 'flat'; %>
+          <div class="kpi">
+            <div class="kpi-label"><%= k.label %></div>
+            <div class="kpi-value"><%= k.money ? money(k.value) : k.value %></div>
+            <span class="delta <%= cls %>"><%= k.delta > 0 ? '↑' : k.delta < 0 ? '↓' : '' %> <%= Math.abs(k.delta) %>%</span><span class="vs"><%= k.vs %></span>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex flex-wrap align-items-start gap-3 mb-3">
+          <div class="me-auto">
+            <div class="panel-title">Money studio</div>
+            <div class="panel-sub">
+              <%= rupees(rangeRecharge) %> recharged in this range ·
+              <span style="color:<%= rangeDelta >= 0 ? '#4ade80' : '#f87171' %>"><%= rangeDelta >= 0 ? '+' : '' %><%= rangeDelta %>%</span> vs the period before
+            </div>
+          </div>
+          <div class="seg">
+            <% [['12m', '12M'], ['30d', '30D'], ['7d', '7D']].forEach(([r, l]) => { %>
+              <a href="/admin?range=<%= r %>" class="<%= range === r ? 'on' : '' %>"><%= l %></a>
+            <% }) %>
+          </div>
+        </div>
+        <div class="d-flex flex-wrap gap-3 mb-2 small text-muted">
+          <span><i class="legend-dot" style="background:#2f7bff"></i>Recharge</span>
+          <span><i class="legend-dot" style="background:#f59e0b"></i>Machine sales</span>
+          <span><i class="legend-dot" style="background:#ef4444"></i>Withdraw requests</span>
+        </div>
+        <div style="position:relative;height:300px"><canvas id="moneyChart" aria-label="Recharge, sales and withdrawals over time" role="img"></canvas></div>
+      </div>
+    </div>
   </div>
-  <% }) %>
+
+  <!-- Right: payout ring + activity -->
+  <div class="col-xl-3">
+    <div class="row g-4">
+      <div class="col-md-6 col-xl-12">
+        <div class="card goal-card h-100"><div class="card-body">
+          <div class="panel-title">Payout ratio</div>
+          <div class="panel-sub mb-3">Withdrawals paid vs total recharge</div>
+          <div class="d-flex flex-column align-items-center gap-3">
+            <svg width="132" height="132" viewBox="0 0 120 120" class="flex-shrink-0">
+              <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="10"/>
+              <circle cx="60" cy="60" r="54" fill="none" stroke="url(#ringGrad)" stroke-width="10" stroke-linecap="round"
+                stroke-dasharray="<%= (ring * payoutPct / 100).toFixed(1) %> <%= ring.toFixed(1) %>" transform="rotate(-90 60 60)"/>
+              <defs><linearGradient id="ringGrad" x1="0" x2="1"><stop offset="0" stop-color="#3b86ff"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
+              <text x="60" y="58" text-anchor="middle" fill="#fff" font-size="22" font-weight="800"><%= payoutPct %>%</text>
+              <text x="60" y="76" text-anchor="middle" fill="#8a93a8" font-size="10">paid out</text>
+            </svg>
+            <div class="small w-100">
+              <div class="d-flex justify-content-between py-1"><span class="text-muted">Recharged</span><b><%= money(rechargeTotal) %></b></div>
+              <div class="d-flex justify-content-between py-1"><span class="text-muted">Paid out</span><b><%= money(paidOut) %></b></div>
+              <div class="d-flex justify-content-between py-1"><span class="text-muted">In wallets</span><b><%= money(walletTotal) %></b></div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+      <div class="col-md-6 col-xl-12">
+        <div class="card h-100"><div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="panel-title"><span class="live-dot d-inline-block me-2"></span>Live activity</div>
+            <a href="/admin/transactions" class="ms-auto small">Ledger</a>
+          </div>
+          <div class="panel-sub">Transactions in the last 24 hours</div>
+          <div class="d-flex align-items-baseline gap-2 my-2"><span class="kpi-value m-0"><%= txToday %></span><span class="text-muted small">events</span></div>
+          <div class="bars mb-3">
+            <% activity.forEach((n) => { %><span style="height:<%= Math.max(6, Math.round((n / maxAct) * 100)) %>%" title="<%= n %>"></span><% }) %>
+          </div>
+          <div class="small">
+            <div class="d-flex justify-content-between py-1"><span class="text-muted">Total users</span><b><%= users %></b></div>
+            <div class="d-flex justify-content-between py-1"><span class="text-muted">Active machines</span><b><%= activePurchases %></b></div>
+            <div class="d-flex justify-content-between py-1"><span class="text-muted">Pending payouts</span><b><%= money(pendingAmount) %></b></div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom row -->
+  <div class="col-lg-4">
+    <div class="card h-100"><div class="card-body">
+      <div class="d-flex align-items-start">
+        <div><div class="panel-title">Withdrawal queue</div><div class="panel-sub"><%= pendingWithdrawals %> waiting · <%= money(pendingAmount) %></div></div>
+        <a href="/admin/withdrawals" class="ms-auto small">Queue</a>
+      </div>
+      <div class="mt-2">
+        <% pendingList.forEach((w) => { const u = userMap[w.userId]; %>
+          <div class="row-item">
+            <div class="chip-avatar"><%= initials(u && u.name) %></div>
+            <div class="flex-grow-1 overflow-hidden">
+              <a href="/admin/users/<%= w.userId %>" class="fw-semibold text-body d-block text-truncate"><%= u ? u.name : '#' + w.userId %></a>
+              <div class="small text-muted text-truncate">#<%= w.id %> · <%= w.bank && w.bank.bankName %></div>
+            </div>
+            <div class="fw-bold me-2"><%= money(w.amountPaise) %></div>
+            <form method="post" action="/admin/withdrawals/<%= w.id %>/approve" data-confirm="Approve withdrawal #<%= w.id %>? Make sure you have paid the user.">
+              <input type="hidden" name="back" value="/admin/">
+              <button class="btn btn-sm btn-outline-light">Approve</button>
+            </form>
+          </div>
+        <% }) %>
+        <% if (!pendingList.length) { %><div class="text-muted small py-4 text-center">All caught up — no pending withdrawals.</div><% } %>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card h-100"><div class="card-body">
+      <div class="d-flex align-items-start">
+        <div><div class="panel-title">Top machines</div><div class="panel-sub">Most purchased, all time</div></div>
+        <a href="/admin/products" class="ms-auto small">Machines</a>
+      </div>
+      <div class="mt-2">
+        <% top.forEach((t) => { %>
+          <div class="row-item">
+            <div class="chip-avatar" style="background:rgba(47,123,255,.14);color:#8db8ff">#<%= t._id %></div>
+            <div class="flex-grow-1 overflow-hidden">
+              <div class="fw-semibold text-truncate"><%= t.name %></div>
+              <div class="small text-muted"><%= t.n %> sold · <%= money(t.revenue) %></div>
+            </div>
+            <div class="mini-bar"><span style="width:<%= Math.round((t.n / topMax) * 100) %>%"></span></div>
+          </div>
+        <% }) %>
+        <% if (!top.length) { %><div class="text-muted small py-4 text-center">No machines sold yet.</div><% } %>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card h-100"><div class="card-body">
+      <div class="panel-title">Where money moved</div>
+      <div class="panel-sub mb-3">Last 30 days · <%= money(flowTotal) %></div>
+      <% if (flow.length) { %>
+        <div class="flow-bar mb-3">
+          <% flow.forEach((f) => { %><span style="flex:<%= f.amount %>;background:<%= f.color %>" title="<%= f.mode %>"></span><% }) %>
+        </div>
+        <% flow.forEach((f) => { %>
+          <div class="d-flex align-items-center py-2" style="border-bottom:1px solid var(--line)">
+            <i class="legend-dot" style="background:<%= f.color %>"></i>
+            <span class="me-auto"><%= f.mode === 'Buy' ? 'Machine sales' : f.mode === 'Collect' ? 'Earnings paid' : f.mode %></span>
+            <span class="text-muted small me-3"><%= Math.round((f.amount / flowTotal) * 100) %>%</span>
+            <b><%= money(f.amount) %></b>
+          </div>
+        <% }) %>
+      <% } else { %><div class="text-muted small py-4 text-center">No activity in the last 30 days.</div><% } %>
+    </div></div>
+  </div>
 </div>
-<div class="card">
-  <div class="card-header bg-white d-flex justify-content-between"><b>Recent transactions</b><a href="/admin/transactions">View all</a></div>
-  <div class="table-responsive"><table class="table table-stack table-sm mb-0">
-    <thead><tr><th>#</th><th>User</th><th>Mode</th><th class="text-end">Amount</th><th class="text-end">Balance after</th><th>Note</th><th>Date</th></tr></thead>
-    <tbody>
-    <% recent.forEach((t) => { const u = userMap[t.userId]; %>
-      <tr>
-        <td><%= t.id %></td>
-        <td><a href="/admin/users/<%= t.userId %>"><%= u ? u.name : '#' + t.userId %></a></td>
-        <td><span class="badge text-bg-<%= modeClass(t.mode) %>"><%= t.mode %></span></td>
-        <td class="text-end">₹<%= fmt(t.amountPaise) %></td>
-        <td class="text-end">₹<%= fmt(t.updatedPaise) %></td>
-        <td class="text-truncate" style="max-width:260px"><%= t.note %></td>
-        <td><%= dt(t.createdAt) %></td>
-      </tr>
-    <% }) %>
-    <% if (!recent.length) { %><tr><td colspan="7" class="text-center text-muted py-4">No transactions yet</td></tr><% } %>
-    </tbody>
-  </table></div>
-</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  (function () {
+    const data = <%- JSON.stringify(chart).replace(/</g, '\\u003c') %>;
+    const el = document.getElementById('moneyChart');
+    if (!window.Chart || !el) return;
+    const ctx = el.getContext('2d');
+    const fade = (rgb) => { const g = ctx.createLinearGradient(0, 0, 0, 300); g.addColorStop(0, `rgba(${rgb},.35)`); g.addColorStop(1, `rgba(${rgb},0)`); return g; };
+    const inr = (v) => '₹' + Number(v).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: data.labels,
+        datasets: [
+          { label: 'Recharge', data: data.recharge, borderColor: '#2f7bff', backgroundColor: fade('47,123,255'), fill: true, tension: .42, borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 5 },
+          { label: 'Machine sales', data: data.sales, borderColor: '#f59e0b', backgroundColor: 'transparent', tension: .42, borderWidth: 2, pointRadius: 0, pointHoverRadius: 5 },
+          { label: 'Withdraw requests', data: data.withdraw, borderColor: 'rgba(239,68,68,.85)', borderDash: [5, 5], backgroundColor: 'transparent', tension: .42, borderWidth: 1.6, pointRadius: 0, pointHoverRadius: 4 },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: { backgroundColor: 'rgba(15,21,36,.95)', borderColor: 'rgba(255,255,255,.1)', borderWidth: 1, padding: 12,
+            titleColor: '#fff', bodyColor: '#c9cfdc', callbacks: { label: (c) => ` ${c.dataset.label}: ${inr(c.parsed.y)}` } },
+        },
+        scales: {
+          x: { grid: { display: false }, border: { display: false }, ticks: { color: '#8a93a8', maxRotation: 0, autoSkipPadding: 14, font: { family: 'Plus Jakarta Sans' } } },
+          y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,.06)' }, border: { display: false },
+               ticks: { color: '#8a93a8', font: { family: 'Plus Jakarta Sans' }, callback: (v) => v >= 1000 ? '₹' + (v / 1000).toFixed(v >= 10000 ? 0 : 1) + 'k' : '₹' + v } },
+        },
+      },
+    });
+  })();
+</script>
 <%- include('partials/footer') %>

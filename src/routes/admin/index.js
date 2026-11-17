@@ -67,48 +67,151 @@ router.post('/logout', (req, res) => {
 
 router.use(requireAdmin);
 
+// Sidebar badge + greeting, available on every admin page.
+router.use(
+  wrap(async (req, res, next) => {
+    res.locals.pendingWithdrawals = await Withdrawal.countDocuments({ status: 'pending' });
+    const hour = Number(new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: TIMEZONE })) % 24;
+    res.locals.greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    res.locals.today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: TIMEZONE });
+    next();
+  })
+);
+
 // ---------- Dashboard ----------
+const DAY = 864e5;
+// Calendar keys in the admin timezone: 'YYYY-MM-DD' (or 'YYYY-MM' for months).
+const dayKey = (d) => new Date(d).toLocaleDateString('en-CA', { timeZone: TIMEZONE });
+// Midnight (start of today) in the admin timezone, as a UTC Date.
+function tzMidnight(d) {
+  const offset = new Date(d.toLocaleString('en-US', { timeZone: TIMEZONE })) - new Date(d.toLocaleString('en-US', { timeZone: 'UTC' }));
+  return new Date(Date.parse(`${dayKey(d)}T00:00:00Z`) - offset);
+}
+const pctChange = (now, prev) => (prev > 0 ? Math.round(((now - prev) / prev) * 100) : now > 0 ? 100 : 0);
+
 router.get(
   '/',
   wrap(async (req, res) => {
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    const now = new Date();
+    const range = ['7d', '30d', '12m'].includes(req.query.range) ? req.query.range : '30d';
+    const startOfDay = tzMidnight(now);
     const sumBy = async (match) => {
       const [r] = await Transaction.aggregate([{ $match: match }, { $group: { _id: null, t: { $sum: '$amountPaise' } } }]);
       return r ? r.t : 0;
     };
-    const [users, usersToday, balanceAgg, pending, pendingAgg, activePurchases] = await Promise.all([
-      User.countDocuments(),
-      User.countDocuments({ createdAt: { $gte: startOfDay } }),
-      User.aggregate([{ $group: { _id: null, t: { $sum: '$balancePaise' } } }]),
-      Withdrawal.countDocuments({ status: 'pending' }),
-      Withdrawal.aggregate([{ $match: { status: 'pending' } }, { $group: { _id: null, t: { $sum: '$amountPaise' } } }]),
-      Purchase.countDocuments({ expiresAt: { $gt: new Date() } }),
+    const between = (from, to) => ({ $gte: from, $lt: to });
+
+    // KPI strip with "vs previous period" deltas.
+    const [rechargeToday, rechargeYesterday, recharge7, rechargePrev7, sales7, salesPrev7, usersToday, usersYesterday] =
+      await Promise.all([
+        sumBy({ mode: 'Recharge', createdAt: { $gte: startOfDay } }),
+        sumBy({ mode: 'Recharge', createdAt: between(new Date(startOfDay - DAY), startOfDay) }),
+        sumBy({ mode: 'Recharge', createdAt: { $gte: new Date(now - 7 * DAY) } }),
+        sumBy({ mode: 'Recharge', createdAt: between(new Date(now - 14 * DAY), new Date(now - 7 * DAY)) }),
+        sumBy({ mode: 'Buy', createdAt: { $gte: new Date(now - 7 * DAY) } }),
+        sumBy({ mode: 'Buy', createdAt: between(new Date(now - 14 * DAY), new Date(now - 7 * DAY)) }),
+        User.countDocuments({ createdAt: { $gte: startOfDay } }),
+        User.countDocuments({ createdAt: between(new Date(startOfDay - DAY), startOfDay) }),
+      ]);
+    const kpis = [
+      { label: 'Recharge today', value: rechargeToday, money: true, delta: pctChange(rechargeToday, rechargeYesterday), vs: 'vs yesterday' },
+      { label: 'Recharge · 7 days', value: recharge7, money: true, delta: pctChange(recharge7, rechargePrev7), vs: 'vs week before' },
+      { label: 'Sales · 7 days', value: sales7, money: true, delta: pctChange(sales7, salesPrev7), vs: 'vs week before' },
+      { label: 'New users today', value: usersToday, money: false, delta: pctChange(usersToday, usersYesterday), vs: 'vs yesterday' },
+    ];
+
+    // Chart series: recharge, sales and withdrawals per day (or per month for 12M).
+    const monthly = range === '12m';
+    const points = range === '7d' ? 7 : range === '30d' ? 30 : 12;
+    const from = monthly
+      ? new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 11, 1))
+      : new Date(startOfDay - (points - 1) * DAY);
+    const buckets = await Transaction.aggregate([
+      { $match: { createdAt: { $gte: from }, mode: { $in: ['Recharge', 'Buy', 'Withdraw'] } } },
+      { $group: {
+          _id: { k: { $dateToString: { format: monthly ? '%Y-%m' : '%Y-%m-%d', date: '$createdAt', timezone: TIMEZONE } }, mode: '$mode' },
+          t: { $sum: '$amountPaise' } } },
     ]);
-    const [rechargeTotal, rechargeToday, buyTotal, collectTotal, paidOutAgg] = await Promise.all([
-      sumBy({ mode: 'Recharge' }),
-      sumBy({ mode: 'Recharge', createdAt: { $gte: startOfDay } }),
-      sumBy({ mode: 'Buy' }),
-      sumBy({ mode: 'Collect' }),
-      Withdrawal.aggregate([{ $match: { status: 'approved' } }, { $group: { _id: null, t: { $sum: '$amountPaise' } } }]),
+    const keys = [];
+    const labels = [];
+    for (let i = points - 1; i >= 0; i--) {
+      if (monthly) {
+        const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 15));
+        keys.push(dayKey(d).slice(0, 7));
+        labels.push(d.toLocaleDateString('en-IN', { month: 'short', timeZone: TIMEZONE }));
+      } else {
+        const d = new Date(now - i * DAY);
+        keys.push(dayKey(d));
+        labels.push(d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: TIMEZONE }));
+      }
+    }
+    const series = (mode) => keys.map((k) => (buckets.find((b) => b._id.k === k && b._id.mode === mode)?.t || 0) / 100);
+    const chart = { labels, recharge: series('Recharge'), sales: series('Buy'), withdraw: series('Withdraw') };
+    const rangeRecharge = chart.recharge.reduce((a, b) => a + b, 0);
+    const prevFrom = monthly ? new Date(from.getTime() - 365 * DAY) : new Date(from - points * DAY);
+    const prevRecharge = (await sumBy({ mode: 'Recharge', createdAt: between(prevFrom, from) })) / 100;
+
+    // Money flow in the last 30 days, by transaction type.
+    const flowAgg = await Transaction.aggregate([
+      { $match: { createdAt: { $gte: new Date(now - 30 * DAY) } } },
+      { $group: { _id: '$mode', t: { $sum: '$amountPaise' } } },
     ]);
-    const recent = await Transaction.find().sort({ id: -1 }).limit(10);
+    const flowColors = { Recharge: '#2f7bff', Buy: '#f59e0b', Collect: '#22c55e', Withdraw: '#ef4444', Referral: '#22d3ee', Bonus: '#a78bfa' };
+    const flow = Object.keys(flowColors)
+      .map((m) => ({ mode: m, color: flowColors[m], amount: flowAgg.find((f) => f._id === m)?.t || 0 }))
+      .filter((f) => f.amount > 0);
+    const flowTotal = flow.reduce((a, f) => a + f.amount, 0);
+
+    // Side panels.
+    const [pendingList, pendingAgg, topAgg, activePurchases, users, balanceAgg, rechargeTotal, paidAgg, hourly] =
+      await Promise.all([
+        Withdrawal.find({ status: 'pending' }).sort({ id: 1 }).limit(4),
+        Withdrawal.aggregate([{ $match: { status: 'pending' } }, { $group: { _id: null, t: { $sum: '$amountPaise' } } }]),
+        Purchase.aggregate([
+          { $group: { _id: '$productId', n: { $sum: 1 }, revenue: { $sum: '$pricePaise' }, name: { $last: '$productName' } } },
+          { $sort: { n: -1 } },
+          { $limit: 4 },
+        ]),
+        Purchase.countDocuments({ expiresAt: { $gt: now } }),
+        User.countDocuments(),
+        User.aggregate([{ $group: { _id: null, t: { $sum: '$balancePaise' } } }]),
+        sumBy({ mode: 'Recharge' }),
+        Withdrawal.aggregate([{ $match: { status: 'approved' } }, { $group: { _id: null, t: { $sum: '$amountPaise' } } }]),
+        Transaction.aggregate([
+          { $match: { createdAt: { $gte: new Date(now - DAY) } } },
+          { $group: { _id: { $dateToString: { format: '%Y-%m-%dT%H', date: '$createdAt', timezone: TIMEZONE } }, n: { $sum: 1 } } },
+        ]),
+      ]);
+    const hourKeys = Array.from({ length: 24 }, (_, i) => {
+      const d = new Date(now - (23 - i) * 3600e3);
+      const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' })
+        .formatToParts(d).map((x) => [x.type, x.value]));
+      return `${p.year}-${p.month}-${p.day}T${p.hour}`;
+    });
+    const activity = hourKeys.map((k) => hourly.find((h) => h._id === k)?.n || 0);
+    const paidOut = paidAgg[0]?.t || 0;
+
     res.render('admin/dashboard', {
-      stats: {
-        users,
-        usersToday,
-        walletTotal: balanceAgg[0]?.t || 0,
-        pending,
-        pendingAmount: pendingAgg[0]?.t || 0,
-        activePurchases,
-        rechargeTotal,
-        rechargeToday,
-        buyTotal,
-        collectTotal,
-        paidOut: paidOutAgg[0]?.t || 0,
-      },
-      recent,
-      userMap: await usersById(recent.map((t) => t.userId)),
+      range,
+      kpis,
+      chart,
+      rangeRecharge,
+      rangeDelta: pctChange(rangeRecharge, prevRecharge),
+      flow,
+      flowTotal,
+      pendingList,
+      pendingAmount: pendingAgg[0]?.t || 0,
+      top: topAgg,
+      topMax: Math.max(1, ...topAgg.map((t) => t.n)),
+      activity,
+      txToday: activity.reduce((a, b) => a + b, 0),
+      users,
+      activePurchases,
+      walletTotal: balanceAgg[0]?.t || 0,
+      rechargeTotal,
+      paidOut,
+      payoutPct: rechargeTotal > 0 ? Math.min(100, Math.round((paidOut / rechargeTotal) * 100)) : 0,
+      userMap: await usersById(pendingList.map((w) => w.userId)),
     });
   })
 );

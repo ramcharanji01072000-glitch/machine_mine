@@ -7,14 +7,14 @@
     <div class="col-md-2"><input name="routes" class="form-control" placeholder="Route (optional)"></div>
     <div class="col-md-1"><input name="order" type="number" class="form-control" value="0" title="Order"></div>
     <div class="col-md-1 form-check ms-2 mb-2"><input class="form-check-input" type="checkbox" name="status" id="ns" checked><label for="ns" class="form-check-label">On</label></div>
-    <div class="col-md-auto"><button class="btn btn-danger">Add</button></div>
+    <div class="col-md-auto"><button class="btn btn-primary">Add</button></div>
   </form>
 </div>
 <div class="row g-3">
   <% slides.forEach((s) => { %>
   <div class="col-md-6 col-xl-4">
     <div class="card h-100">
-      <img src="<%= s.image %>" class="card-img-top" style="height:160px;object-fit:cover;background:#e9ecef" alt="">
+      <img src="<%= s.image %>" class="card-img-top" style="height:160px;object-fit:cover;background:rgba(255,255,255,.06)" alt="">
       <form method="post" action="/admin/carousel/<%= s._id %>" enctype="multipart/form-data" class="card-body vstack gap-2">
         <input name="caption" class="form-control form-control-sm" value="<%= s.caption %>" placeholder="Caption">
         <div class="d-flex gap-2">
@@ -27,7 +27,7 @@
           <button class="btn btn-sm btn-dark">Save</button>
         </div>
       </form>
-      <form method="post" action="/admin/carousel/<%= s._id %>/delete" class="card-footer bg-white text-end" data-confirm="Delete this slide?">
+      <form method="post" action="/admin/carousel/<%= s._id %>/delete" class="card-footer text-end" data-confirm="Delete this slide?">
         <button class="btn btn-sm btn-link text-danger">Delete</button></form>
     </div>
   </div>

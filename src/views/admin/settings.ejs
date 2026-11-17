@@ -5,9 +5,9 @@
       <h6>App logo <small class="text-muted">(splash, login &amp; About screens)</small></h6>
       <div class="d-flex align-items-center gap-3 mb-3">
         <% if (s.logo) { %>
-          <img src="<%= s.logo %>" alt="" style="width:64px;height:64px;object-fit:contain;border-radius:14px;background:#f1f1f4">
+          <img src="<%= s.logo %>" alt="" style="width:64px;height:64px;object-fit:contain;border-radius:14px;background:rgba(255,255,255,.06)">
         <% } else { %>
-          <div class="text-muted small" style="width:64px;height:64px;border-radius:14px;background:#f1f1f4;display:grid;place-items:center">None</div>
+          <div class="text-muted small" style="width:64px;height:64px;border-radius:14px;background:rgba(255,255,255,.06);display:grid;place-items:center">None</div>
         <% } %>
         <div class="flex-grow-1">
           <input name="logo" type="file" accept="image/png,image/jpeg,image/webp" class="form-control">
@@ -38,7 +38,7 @@
         <div class="col-md-6"><label class="form-label">Signup bonus (₹)</label>
           <input name="signupBonus" type="number" step="0.01" min="0" class="form-control" value="<%= fmt(s.signupBonusPaise) %>"></div>
       </div>
-      <div><button class="btn btn-danger">Save settings</button></div>
+      <div><button class="btn btn-primary">Save settings</button></div>
     </form>
   </div>
   <div class="col-lg-4">
