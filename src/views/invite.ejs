@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Join MachineMine</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #f4f5f7; margin: 0; display: grid; place-items: center; min-height: 100vh; }
+    .card { background: #fff; padding: 32px; border-radius: 12px; max-width: 360px; width: calc(100% - 32px); text-align: center; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+    .code { font-size: 28px; letter-spacing: 4px; font-weight: 700; background: #f0f0f0; padding: 12px; border-radius: 8px; margin: 16px 0; }
+    a.btn { display: block; background: #111; color: #fff; padding: 12px; border-radius: 8px; text-decoration: none; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>You're invited to MachineMine</h2>
+    <p>Use this refer code when you sign up:</p>
+    <div class="code"><%= code %></div>
+    <% if (androidLink) { %><a class="btn" href="<%= androidLink %>">Download for Android</a><% } %>
+    <% if (iosLink) { %><a class="btn" href="<%= iosLink %>">Download for iOS</a><% } %>
+  </div>
+</body>
+</html>

@@ -1,0 +1,29 @@
+<%- include('partials/header', { title: 'Transactions' }) %>
+<form class="row g-2 mb-3">
+  <div class="col-auto"><input name="userId" class="form-control" placeholder="User ID" value="<%= query.userId || '' %>"></div>
+  <div class="col-auto"><select name="mode" class="form-select">
+    <option value="">All modes</option>
+    <% modes.forEach((m) => { %><option <%= query.mode === m ? 'selected' : '' %>><%= m %></option><% }) %>
+  </select></div>
+  <div class="col-auto"><button class="btn btn-dark">Filter</button></div>
+</form>
+<div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0">
+  <thead><tr><th>#</th><th>User</th><th>Mode</th><th class="text-end">Amount</th><th class="text-end">Before</th><th class="text-end">After</th><th>Note</th><th>Date</th></tr></thead>
+  <tbody>
+  <% transactions.forEach((t) => { const u = userMap[t.userId]; %>
+    <tr>
+      <td><%= t.id %></td>
+      <td><a href="/admin/users/<%= t.userId %>"><%= u ? u.name : '#' + t.userId %></a></td>
+      <td><span class="badge text-bg-<%= modeClass(t.mode) %>"><%= t.mode %></span></td>
+      <td class="text-end">₹<%= fmt(t.amountPaise) %></td>
+      <td class="text-end">₹<%= fmt(t.previousPaise) %></td>
+      <td class="text-end">₹<%= fmt(t.updatedPaise) %></td>
+      <td class="text-truncate" style="max-width:300px"><%= t.note %></td>
+      <td><%= dt(t.createdAt) %></td>
+    </tr>
+  <% }) %>
+  <% if (!transactions.length) { %><tr><td colspan="8" class="text-center text-muted py-4">No transactions</td></tr><% } %>
+  </tbody>
+</table></div></div>
+<%- include('partials/pager') %>
+<%- include('partials/footer') %>

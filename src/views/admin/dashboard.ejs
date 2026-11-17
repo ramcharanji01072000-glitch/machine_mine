@@ -1,0 +1,43 @@
+<%- include('partials/header', { title: 'Dashboard' }) %>
+<% const cards = [
+  ['Total users', stats.users, `+${stats.usersToday} today`, '/admin/users'],
+  ['Wallet balances (liability)', '₹' + fmt(stats.walletTotal), 'sum of all user balances', '/admin/users'],
+  ['Pending withdrawals', stats.pending, '₹' + fmt(stats.pendingAmount) + ' awaiting', '/admin/withdrawals'],
+  ['Active purchases', stats.activePurchases, 'not yet expired', '/admin/purchases?state=active'],
+  ['Total recharge', '₹' + fmt(stats.rechargeTotal), '₹' + fmt(stats.rechargeToday) + ' today', '/admin/transactions?mode=Recharge'],
+  ['Product sales', '₹' + fmt(stats.buyTotal), 'all time', '/admin/transactions?mode=Buy'],
+  ['Earnings collected', '₹' + fmt(stats.collectTotal), 'paid to wallets', '/admin/transactions?mode=Collect'],
+  ['Withdrawals paid', '₹' + fmt(stats.paidOut), 'approved', '/admin/withdrawals?status=approved'],
+]; %>
+<div class="row g-3 mb-4">
+  <% cards.forEach(([label, value, sub, href]) => { %>
+  <div class="col-6 col-lg-3">
+    <a href="<%= href %>" class="card h-100 text-decoration-none text-body"><div class="card-body">
+      <div class="text-muted small"><%= label %></div>
+      <div class="stat"><%= value %></div>
+      <div class="small text-muted"><%= sub %></div>
+    </div></a>
+  </div>
+  <% }) %>
+</div>
+<div class="card">
+  <div class="card-header bg-white d-flex justify-content-between"><b>Recent transactions</b><a href="/admin/transactions">View all</a></div>
+  <div class="table-responsive"><table class="table table-sm mb-0">
+    <thead><tr><th>#</th><th>User</th><th>Mode</th><th class="text-end">Amount</th><th class="text-end">Balance after</th><th>Note</th><th>Date</th></tr></thead>
+    <tbody>
+    <% recent.forEach((t) => { const u = userMap[t.userId]; %>
+      <tr>
+        <td><%= t.id %></td>
+        <td><a href="/admin/users/<%= t.userId %>"><%= u ? u.name : '#' + t.userId %></a></td>
+        <td><span class="badge text-bg-<%= modeClass(t.mode) %>"><%= t.mode %></span></td>
+        <td class="text-end">₹<%= fmt(t.amountPaise) %></td>
+        <td class="text-end">₹<%= fmt(t.updatedPaise) %></td>
+        <td class="text-truncate" style="max-width:260px"><%= t.note %></td>
+        <td><%= dt(t.createdAt) %></td>
+      </tr>
+    <% }) %>
+    <% if (!recent.length) { %><tr><td colspan="7" class="text-center text-muted py-4">No transactions yet</td></tr><% } %>
+    </tbody>
+  </table></div>
+</div>
+<%- include('partials/footer') %>

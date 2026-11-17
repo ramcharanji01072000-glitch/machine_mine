@@ -1,0 +1,124 @@
+<%- include('partials/header', { title: `User #${user.id} · ${user.name}` }) %>
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card mb-3"><div class="card-body">
+      <div class="text-muted small">Wallet balance</div>
+      <div class="stat mb-2">₹<%= fmt(user.balancePaise) %></div>
+      <form method="post" action="/admin/users/<%= user.id %>/wallet" class="row g-2" data-confirm="Apply this wallet change?">
+        <div class="col-5"><select name="action" class="form-select">
+          <option value="Recharge">Recharge (+)</option><option value="Bonus">Bonus (+)</option><option value="Deduct">Deduct (−)</option>
+        </select></div>
+        <div class="col-7"><input name="amount" type="number" step="0.01" min="0.01" class="form-control" placeholder="Amount ₹" required></div>
+        <div class="col-12"><input name="note" class="form-control" placeholder="Note (optional, e.g. UPI ref)"></div>
+        <div class="col-12"><button class="btn btn-success w-100">Apply</button></div>
+      </form>
+    </div></div>
+
+    <div class="card mb-3"><div class="card-body">
+      <h6>Profile</h6>
+      <form method="post" action="/admin/users/<%= user.id %>/edit" class="vstack gap-2">
+        <input name="name" class="form-control" value="<%= user.name %>" required>
+        <input name="mobile" class="form-control" value="<%= user.mobile %>" required>
+        <input name="email" class="form-control" value="<%= user.email || '' %>" placeholder="Email">
+        <button class="btn btn-outline-dark btn-sm">Save profile</button>
+      </form>
+      <hr>
+      <dl class="row small mb-0">
+        <dt class="col-5">Invite code</dt><dd class="col-7"><code><%= user.inviteCode %></code></dd>
+        <dt class="col-5">Referred by</dt><dd class="col-7"><% if (referrer) { %><a href="/admin/users/<%= referrer.id %>"><%= referrer.name %></a> (<%= user.referredBy %>)<% } else { %>-<% } %></dd>
+        <dt class="col-5">Security Q</dt><dd class="col-7"><%= user.question || '-' %></dd>
+        <dt class="col-5">Joined</dt><dd class="col-7"><%= dt(user.createdAt) %></dd>
+        <dt class="col-5">Last login</dt><dd class="col-7"><%= dt(user.lastLoginAt) %></dd>
+      </dl>
+    </div></div>
+
+    <div class="card mb-3"><div class="card-body">
+      <h6>Security</h6>
+      <form method="post" action="/admin/users/<%= user.id %>/password" class="row g-2 mb-2">
+        <div class="col-5"><select name="which" class="form-select form-select-sm"><option value="login">Login pwd</option><option value="withdraw">Withdraw pwd</option></select></div>
+        <div class="col-7"><input name="password" type="text" minlength="6" class="form-control form-control-sm" placeholder="New password" required></div>
+        <div class="col-12"><button class="btn btn-outline-secondary btn-sm w-100">Reset password</button></div>
+      </form>
+      <form method="post" action="/admin/users/<%= user.id %>/block" data-confirm="<%= user.isBlocked ? 'Unblock' : 'Block' %> this user?">
+        <button class="btn btn-sm w-100 <%= user.isBlocked ? 'btn-success' : 'btn-danger' %>"><%= user.isBlocked ? 'Unblock user' : 'Block user (logs them out)' %></button>
+      </form>
+    </div></div>
+
+    <div class="card"><div class="card-body small">
+      <h6>Bank details</h6>
+      <% if (bank) { %>
+        <div><b><%= bank.fullName %></b></div>
+        <div><%= bank.bankName %></div>
+        <div>A/C <code><%= bank.bankAccount %></code></div>
+        <div>IFSC <code><%= bank.ifsc %></code></div>
+        <div>Phone <%= bank.phoneNumber || '-' %></div>
+      <% } else { %><span class="text-muted">Not added</span><% } %>
+    </div></div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="card mb-3">
+      <div class="card-header bg-white d-flex justify-content-between"><b>Transactions</b><a href="/admin/transactions?userId=<%= user.id %>">All</a></div>
+      <div class="table-responsive"><table class="table table-sm mb-0">
+        <thead><tr><th>#</th><th>Mode</th><th class="text-end">Amount</th><th class="text-end">Before</th><th class="text-end">After</th><th>Note</th><th>Date</th></tr></thead>
+        <tbody>
+        <% transactions.forEach((t) => { %>
+          <tr><td><%= t.id %></td><td><span class="badge text-bg-<%= modeClass(t.mode) %>"><%= t.mode %></span></td>
+            <td class="text-end">₹<%= fmt(t.amountPaise) %></td><td class="text-end">₹<%= fmt(t.previousPaise) %></td><td class="text-end">₹<%= fmt(t.updatedPaise) %></td>
+            <td class="text-truncate" style="max-width:220px"><%= t.note %></td><td><%= dt(t.createdAt) %></td></tr>
+        <% }) %>
+        <% if (!transactions.length) { %><tr><td colspan="7" class="text-center text-muted py-3">None</td></tr><% } %>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header bg-white"><b>Purchases</b></div>
+      <div class="table-responsive"><table class="table table-sm mb-0">
+        <thead><tr><th>#</th><th>Product</th><th>Type</th><th class="text-end">Price</th><th class="text-end">Claimed / Total</th><th>Last claim</th><th>Expires</th></tr></thead>
+        <tbody>
+        <% purchases.forEach((p) => { %>
+          <tr><td><%= p.id %></td><td><%= p.productName %></td><td><%= p.productType %></td><td class="text-end">₹<%= fmt(p.pricePaise) %></td>
+            <td class="text-end">₹<%= fmt(p.claimedPaise) %> / ₹<%= fmt(p.totalReturnPaise) %></td><td><%= dt(p.lastClaimAt) %></td>
+            <td><%= dt(p.expiresAt) %> <% if (p.expiresAt <= new Date()) { %><span class="badge text-bg-secondary">expired</span><% } %></td></tr>
+        <% }) %>
+        <% if (!purchases.length) { %><tr><td colspan="7" class="text-center text-muted py-3">None</td></tr><% } %>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header bg-white"><b>Withdrawals</b></div>
+      <div class="table-responsive"><table class="table table-sm mb-0">
+        <thead><tr><th>#</th><th class="text-end">Amount</th><th>Status</th><th>Requested</th><th>Remark</th><th></th></tr></thead>
+        <tbody>
+        <% withdrawals.forEach((w) => { %>
+          <tr><td><%= w.id %></td><td class="text-end">₹<%= fmt(w.amountPaise) %></td>
+            <td><span class="badge text-bg-<%= { pending: 'warning', approved: 'success', rejected: 'danger' }[w.status] %>"><%= w.status %></span></td>
+            <td><%= dt(w.createdAt) %></td><td><%= w.remark || '' %></td>
+            <td><% if (w.status === 'pending') { %>
+              <form method="post" action="/admin/withdrawals/<%= w.id %>/approve" class="d-inline" data-confirm="Approve? Make sure you have paid the user.">
+                <input type="hidden" name="back" value="/admin/users/<%= user.id %>"><button class="btn btn-sm btn-success">Approve</button></form>
+              <form method="post" action="/admin/withdrawals/<%= w.id %>/reject" class="d-inline" data-confirm="Reject and refund to wallet?">
+                <input type="hidden" name="back" value="/admin/users/<%= user.id %>"><button class="btn btn-sm btn-outline-danger">Reject</button></form>
+            <% } %></td></tr>
+        <% }) %>
+        <% if (!withdrawals.length) { %><tr><td colspan="6" class="text-center text-muted py-3">None</td></tr><% } %>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header bg-white"><b>Direct team (level 1)</b> · <%= directTeam.length %></div>
+      <div class="table-responsive"><table class="table table-sm mb-0">
+        <tbody>
+        <% directTeam.forEach((m) => { %>
+          <tr><td><a href="/admin/users/<%= m.id %>">#<%= m.id %> <%= m.name %></a></td><td><%= m.mobile %></td><td><%= dt(m.createdAt) %></td></tr>
+        <% }) %>
+        <% if (!directTeam.length) { %><tr><td class="text-center text-muted py-3">No referrals</td></tr><% } %>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+</div>
+<%- include('partials/footer') %>

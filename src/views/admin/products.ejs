@@ -1,0 +1,36 @@
+<%- include('partials/header', { title: 'Products' }) %>
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <div class="btn-group">
+    <a href="/admin/products" class="btn btn-outline-dark <%= !query.type ? 'active' : '' %>">All</a>
+    <a href="/admin/products?type=Normal" class="btn btn-outline-dark <%= query.type === 'Normal' ? 'active' : '' %>">Normal</a>
+    <a href="/admin/products?type=Welfare" class="btn btn-outline-dark <%= query.type === 'Welfare' ? 'active' : '' %>">Welfare</a>
+  </div>
+  <a href="/admin/products/new" class="btn btn-danger ms-auto">+ New product</a>
+</div>
+<div class="card"><div class="table-responsive"><table class="table table-hover mb-0">
+  <thead><tr><th>ID</th><th></th><th>Name</th><th>Type</th><th class="text-end">Price</th><th class="text-end">Daily</th><th class="text-end">Days</th><th class="text-end">Total return</th><th class="text-end">Limit</th><th class="text-end">Sold</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+  <% products.forEach((p) => { %>
+    <tr>
+      <td><%= p.id %></td>
+      <td><% if (p.image) { %><img class="thumb" src="<%= p.image %>" alt=""><% } else { %><div class="thumb"></div><% } %></td>
+      <td><%= p.name %></td>
+      <td><span class="badge text-bg-<%= p.type === 'Welfare' ? 'info' : 'secondary' %>"><%= p.type %></span></td>
+      <td class="text-end">₹<%= fmt(p.pricePaise) %></td>
+      <td class="text-end">₹<%= fmt(Math.round(p.totalReturnPaise / p.durationDays)) %></td>
+      <td class="text-end"><%= p.durationDays %></td>
+      <td class="text-end">₹<%= fmt(p.totalReturnPaise) %></td>
+      <td class="text-end"><%= p.purchaseLimit || '∞' %></td>
+      <td class="text-end"><%= sold[p.id] || 0 %></td>
+      <td><%- p.isActive ? '<span class="badge text-bg-success">Active</span>' : '<span class="badge text-bg-secondary">Hidden</span>' %></td>
+      <td class="text-end">
+        <a class="btn btn-sm btn-outline-dark" href="/admin/products/<%= p.id %>/edit">Edit</a>
+        <form method="post" action="/admin/products/<%= p.id %>/delete" class="d-inline" data-confirm="Delete this product? (It will be deactivated instead if anyone bought it.)">
+          <button class="btn btn-sm btn-outline-danger">Delete</button></form>
+      </td>
+    </tr>
+  <% }) %>
+  <% if (!products.length) { %><tr><td colspan="12" class="text-center text-muted py-4">No products yet</td></tr><% } %>
+  </tbody>
+</table></div></div>
+<%- include('partials/footer') %>

@@ -1,0 +1,40 @@
+<%- include('partials/header', { title: 'Withdrawals' }) %>
+<div class="btn-group mb-3">
+  <% ['pending', 'approved', 'rejected'].forEach((s) => { %>
+    <a href="/admin/withdrawals?status=<%= s %>" class="btn btn-outline-dark text-capitalize <%= status === s ? 'active' : '' %>"><%= s %></a>
+  <% }) %>
+</div>
+<% if (status === 'pending') { %>
+  <p class="text-muted small">The amount was already deducted from the user's wallet when they requested it. <b>Approve</b> after you've paid them; <b>Reject</b> refunds it to their wallet (shown as "WithdrawFailure" in the app).</p>
+<% } %>
+<div class="card"><div class="table-responsive"><table class="table table-hover mb-0">
+  <thead><tr><th>#</th><th>User</th><th class="text-end">Amount</th><th>Bank</th><th>Account</th><th>IFSC</th><th>Ref</th><th>Requested</th><th><%= status === 'pending' ? 'Action' : 'Processed' %></th></tr></thead>
+  <tbody>
+  <% withdrawals.forEach((w) => { const u = userMap[w.userId]; %>
+    <tr>
+      <td><%= w.id %></td>
+      <td><a href="/admin/users/<%= w.userId %>"><%= u ? u.name : '#' + w.userId %></a><br><small class="text-muted"><%= u ? u.mobile : '' %></small></td>
+      <td class="text-end fw-semibold">₹<%= fmt(w.amountPaise) %></td>
+      <td><%= w.bank.fullName %><br><small class="text-muted"><%= w.bank.bankName %></small></td>
+      <td><code><%= w.bank.bankAccount %></code></td>
+      <td><code><%= w.bank.ifsc %></code></td>
+      <td><small><%= w.transactionNumber || '' %></small></td>
+      <td><%= dt(w.createdAt) %></td>
+      <td>
+        <% if (w.status === 'pending') { %>
+          <form method="post" action="/admin/withdrawals/<%= w.id %>/approve" class="d-inline" data-confirm="Approve withdrawal #<%= w.id %>? Make sure you have paid the user.">
+            <button class="btn btn-sm btn-success">Approve</button></form>
+          <form method="post" action="/admin/withdrawals/<%= w.id %>/reject" class="d-inline-flex gap-1" data-confirm="Reject #<%= w.id %> and refund to wallet?">
+            <input name="remark" class="form-control form-control-sm" placeholder="Reason" style="width:120px">
+            <button class="btn btn-sm btn-outline-danger">Reject</button></form>
+        <% } else { %>
+          <%= dt(w.processedAt) %><% if (w.remark) { %><br><small class="text-muted"><%= w.remark %></small><% } %>
+        <% } %>
+      </td>
+    </tr>
+  <% }) %>
+  <% if (!withdrawals.length) { %><tr><td colspan="9" class="text-center text-muted py-4">No <%= status %> withdrawals</td></tr><% } %>
+  </tbody>
+</table></div></div>
+<%- include('partials/pager') %>
+<%- include('partials/footer') %>

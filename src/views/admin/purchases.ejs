@@ -1,0 +1,31 @@
+<%- include('partials/header', { title: 'Purchases' }) %>
+<form class="row g-2 mb-3">
+  <div class="col-auto"><input name="userId" class="form-control" placeholder="User ID" value="<%= query.userId || '' %>"></div>
+  <div class="col-auto"><select name="state" class="form-select">
+    <option value="">All</option>
+    <option value="active" <%= query.state === 'active' ? 'selected' : '' %>>Active</option>
+    <option value="expired" <%= query.state === 'expired' ? 'selected' : '' %>>Expired</option>
+  </select></div>
+  <div class="col-auto"><button class="btn btn-dark">Filter</button></div>
+</form>
+<div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0">
+  <thead><tr><th>#</th><th>User</th><th>Product</th><th>Type</th><th class="text-end">Price</th><th class="text-end">Claimed / Total</th><th>Bought</th><th>Last claim</th><th>Expires</th></tr></thead>
+  <tbody>
+  <% purchases.forEach((p) => { const u = userMap[p.userId]; %>
+    <tr>
+      <td><%= p.id %></td>
+      <td><a href="/admin/users/<%= p.userId %>"><%= u ? u.name : '#' + p.userId %></a></td>
+      <td><%= p.productName %> <small class="text-muted">#<%= p.productId %></small></td>
+      <td><%= p.productType %></td>
+      <td class="text-end">₹<%= fmt(p.pricePaise) %></td>
+      <td class="text-end">₹<%= fmt(p.claimedPaise) %> / ₹<%= fmt(p.totalReturnPaise) %></td>
+      <td><%= dt(p.createdAt) %></td>
+      <td><%= dt(p.lastClaimAt) %></td>
+      <td><%= dt(p.expiresAt) %> <% if (p.expiresAt <= new Date()) { %><span class="badge text-bg-secondary">expired</span><% } %></td>
+    </tr>
+  <% }) %>
+  <% if (!purchases.length) { %><tr><td colspan="9" class="text-center text-muted py-4">No purchases</td></tr><% } %>
+  </tbody>
+</table></div></div>
+<%- include('partials/pager') %>
+<%- include('partials/footer') %>

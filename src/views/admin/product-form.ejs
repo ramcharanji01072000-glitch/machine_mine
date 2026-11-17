@@ -1,0 +1,46 @@
+<%- include('partials/header', { title: product ? `Edit product #${product.id}` : 'New product' }) %>
+<% const v = (paise) => (product ? (paise / 100).toFixed(2) : ''); %>
+<form method="post" enctype="multipart/form-data" action="/admin/products<%= product ? '/' + product.id : '' %>" class="card card-body" style="max-width:720px">
+  <div class="row g-3">
+    <div class="col-md-8"><label class="form-label">Name</label>
+      <input name="name" class="form-control" value="<%= product ? product.name : '' %>" required></div>
+    <div class="col-md-4"><label class="form-label">Type</label>
+      <select name="type" class="form-select">
+        <option value="Normal" <%= product && product.type === 'Normal' ? 'selected' : '' %>>Normal</option>
+        <option value="Welfare" <%= product && product.type === 'Welfare' ? 'selected' : '' %>>Welfare</option>
+      </select></div>
+    <div class="col-md-4"><label class="form-label">Price (₹)</label>
+      <input id="price" name="price" type="number" step="0.01" min="0.01" class="form-control" value="<%= v(product && product.pricePaise) %>" required></div>
+    <div class="col-md-4"><label class="form-label">Duration (days)</label>
+      <input id="days" name="durationDays" type="number" min="1" step="1" class="form-control" value="<%= product ? product.durationDays : '' %>" required></div>
+    <div class="col-md-4"><label class="form-label">Total return (₹)</label>
+      <input id="tr" name="totalReturn" type="number" step="0.01" min="0" class="form-control" value="<%= v(product && product.totalReturnPaise) %>" required></div>
+    <div class="col-12"><div class="form-text" id="calc"></div></div>
+    <div class="col-md-4"><label class="form-label">Purchase limit per user</label>
+      <input name="purchaseLimit" type="number" min="0" class="form-control" value="<%= product ? product.purchaseLimit : 0 %>">
+      <div class="form-text">0 = unlimited</div></div>
+    <div class="col-md-4"><label class="form-label">Sort order</label>
+      <input name="sortOrder" type="number" class="form-control" value="<%= product ? product.sortOrder : 0 %>"></div>
+    <div class="col-md-4 d-flex align-items-center"><div class="form-check form-switch mt-3">
+      <input class="form-check-input" type="checkbox" name="isActive" id="act" <%= !product || product.isActive ? 'checked' : '' %>>
+      <label class="form-check-label" for="act">Visible in app</label></div></div>
+    <div class="col-12"><label class="form-label">Image</label>
+      <% if (product && product.image) { %><div class="mb-2"><img src="<%= product.image %>" style="max-height:120px;border-radius:6px"></div><% } %>
+      <input name="image" type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="form-control">
+      <div class="form-text">JPG/PNG/WEBP/GIF, max 5 MB<%= product ? '. Leave empty to keep the current image.' : '' %></div></div>
+  </div>
+  <div class="mt-4 d-flex gap-2">
+    <button class="btn btn-danger">Save</button>
+    <a href="/admin/products" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+<script>
+  const calc = () => {
+    const p = +price.value, d = +days.value, t = +tr.value;
+    if (!(p && d)) { document.getElementById('calc').textContent = ''; return; }
+    document.getElementById('calc').textContent =
+      `Daily income ₹${(t / d).toFixed(2)} · Profit ₹${(t - p).toFixed(2)} (${p ? ((t / p - 1) * 100).toFixed(1) : 0}% ROI). Earnings accrue per second and can be claimed hourly in the app.`;
+  };
+  [price, days, tr].forEach((el) => el.addEventListener('input', calc)); calc();
+</script>
+<%- include('partials/footer') %>
