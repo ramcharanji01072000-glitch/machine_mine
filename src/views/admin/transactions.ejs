@@ -7,7 +7,7 @@
   </select></div>
   <div class="col-auto"><button class="btn btn-dark">Filter</button></div>
 </form>
-<div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0">
+<div class="card"><div class="table-responsive"><table class="table table-stack table-sm table-hover mb-0">
   <thead><tr><th>#</th><th>User</th><th>Mode</th><th class="text-end">Amount</th><th class="text-end">Before</th><th class="text-end">After</th><th>Note</th><th>Date</th></tr></thead>
   <tbody>
   <% transactions.forEach((t) => { const u = userMap[t.userId]; %>

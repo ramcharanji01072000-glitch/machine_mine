@@ -5,10 +5,10 @@
       <div class="text-muted small">Wallet balance</div>
       <div class="stat mb-2">₹<%= fmt(user.balancePaise) %></div>
       <form method="post" action="/admin/users/<%= user.id %>/wallet" class="row g-2" data-confirm="Apply this wallet change?">
-        <div class="col-5"><select name="action" class="form-select">
+        <div class="col-6 col-sm-5"><select name="action" class="form-select">
           <option value="Recharge">Recharge (+)</option><option value="Bonus">Bonus (+)</option><option value="Deduct">Deduct (−)</option>
         </select></div>
-        <div class="col-7"><input name="amount" type="number" step="0.01" min="0.01" class="form-control" placeholder="Amount ₹" required></div>
+        <div class="col-6 col-sm-7"><input name="amount" type="number" step="0.01" min="0.01" class="form-control" placeholder="Amount ₹" required></div>
         <div class="col-12"><input name="note" class="form-control" placeholder="Note (optional, e.g. UPI ref)"></div>
         <div class="col-12"><button class="btn btn-success w-100">Apply</button></div>
       </form>
@@ -59,7 +59,7 @@
   <div class="col-lg-8">
     <div class="card mb-3">
       <div class="card-header bg-white d-flex justify-content-between"><b>Transactions</b><a href="/admin/transactions?userId=<%= user.id %>">All</a></div>
-      <div class="table-responsive"><table class="table table-sm mb-0">
+      <div class="table-responsive"><table class="table table-stack table-sm mb-0">
         <thead><tr><th>#</th><th>Mode</th><th class="text-end">Amount</th><th class="text-end">Before</th><th class="text-end">After</th><th>Note</th><th>Date</th></tr></thead>
         <tbody>
         <% transactions.forEach((t) => { %>
@@ -74,7 +74,7 @@
 
     <div class="card mb-3">
       <div class="card-header bg-white"><b>Purchases</b></div>
-      <div class="table-responsive"><table class="table table-sm mb-0">
+      <div class="table-responsive"><table class="table table-stack table-sm mb-0">
         <thead><tr><th>#</th><th>Product</th><th>Type</th><th class="text-end">Price</th><th class="text-end">Claimed / Total</th><th>Last claim</th><th>Expires</th></tr></thead>
         <tbody>
         <% purchases.forEach((p) => { %>
@@ -89,7 +89,7 @@
 
     <div class="card mb-3">
       <div class="card-header bg-white"><b>Withdrawals</b></div>
-      <div class="table-responsive"><table class="table table-sm mb-0">
+      <div class="table-responsive"><table class="table table-stack table-sm mb-0">
         <thead><tr><th>#</th><th class="text-end">Amount</th><th>Status</th><th>Requested</th><th>Remark</th><th></th></tr></thead>
         <tbody>
         <% withdrawals.forEach((w) => { %>
@@ -110,7 +110,7 @@
 
     <div class="card">
       <div class="card-header bg-white"><b>Direct team (level 1)</b> · <%= directTeam.length %></div>
-      <div class="table-responsive"><table class="table table-sm mb-0">
+      <div class="table-responsive"><table class="table table-stack table-sm mb-0">
         <tbody>
         <% directTeam.forEach((m) => { %>
           <tr><td><a href="/admin/users/<%= m.id %>">#<%= m.id %> <%= m.name %></a></td><td><%= m.mobile %></td><td><%= dt(m.createdAt) %></td></tr>

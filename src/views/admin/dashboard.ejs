@@ -22,7 +22,7 @@
 </div>
 <div class="card">
   <div class="card-header bg-white d-flex justify-content-between"><b>Recent transactions</b><a href="/admin/transactions">View all</a></div>
-  <div class="table-responsive"><table class="table table-sm mb-0">
+  <div class="table-responsive"><table class="table table-stack table-sm mb-0">
     <thead><tr><th>#</th><th>User</th><th>Mode</th><th class="text-end">Amount</th><th class="text-end">Balance after</th><th>Note</th><th>Date</th></tr></thead>
     <tbody>
     <% recent.forEach((t) => { const u = userMap[t.userId]; %>

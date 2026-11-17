@@ -7,7 +7,7 @@
 <% if (status === 'pending') { %>
   <p class="text-muted small">The amount was already deducted from the user's wallet when they requested it. <b>Approve</b> after you've paid them; <b>Reject</b> refunds it to their wallet (shown as "WithdrawFailure" in the app).</p>
 <% } %>
-<div class="card"><div class="table-responsive"><table class="table table-hover mb-0">
+<div class="card"><div class="table-responsive"><table class="table table-stack table-hover mb-0">
   <thead><tr><th>#</th><th>User</th><th class="text-end">Amount</th><th>Bank</th><th>Account</th><th>IFSC</th><th>Ref</th><th>Requested</th><th><%= status === 'pending' ? 'Action' : 'Processed' %></th></tr></thead>
   <tbody>
   <% withdrawals.forEach((w) => { const u = userMap[w.userId]; %>
