@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const cors = require('cors');
 const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
+const mongoose = require('mongoose');
 const config = require('./config');
 const { fail } = require('./utils/respond');
 const { Setting } = require('./models');
@@ -22,14 +23,44 @@ app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 app.use(cookieParser());
 app.use('/uploads', express.static(config.uploadDir, { maxAge: '7d', index: false }));
 
+// ---- Health check (for Render / uptime monitors) ----
+// 200 when the server and MongoDB are reachable, 503 otherwise. No auth, never cached.
+const { version } = require('../package.json');
+app.get('/health', async (req, res) => {
+  const started = Date.now();
+  let db = 'down';
+  try {
+    if (mongoose.connection.readyState === 1) {
+      await Promise.race([
+        mongoose.connection.db.admin().ping(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000)),
+      ]);
+      db = 'up';
+    }
+  } catch (e) {
+    db = 'down';
+  }
+  const healthy = db === 'up';
+  res.set('Cache-Control', 'no-store');
+  res.status(healthy ? 200 : 503).json({
+    status: healthy ? 'ok' : 'error',
+    db,
+    uptime: Math.round(process.uptime()),
+    version,
+    time: new Date().toISOString(),
+    responseMs: Date.now() - started,
+  });
+});
+
 // ---- Mobile app API (paths match machinemine/lib/util/app_constant.dart) ----
 const { pr, wf } = require('./routes/api/products');
-const { cs, dt, am, rf } = require('./routes/api/misc');
+const { cs, nt, dt, am, rf } = require('./routes/api/misc');
 app.use('/api/v1/auth', require('./routes/api/auth'));
 app.use('/api/v1/pr', pr);
 app.use('/api/v1/wf', wf);
 app.use('/api/v1/bn', require('./routes/api/bank'));
 app.use('/api/v1/cs', cs);
+app.use('/api/v1/nt', nt);
 app.use('/api/v1/dt', dt);
 app.use('/api/v1/am', am);
 app.use('/api/v1/rf', rf);
