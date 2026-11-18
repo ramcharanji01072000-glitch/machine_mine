@@ -166,7 +166,8 @@ router.get(
     const [pendingList, pendingAgg, topAgg, activePurchases, users, balanceAgg, rechargeTotal, paidAgg, hourly] =
       await Promise.all([
         Withdrawal.find({ status: 'pending' }).sort({ id: 1 }).limit(4),
-        Withdrawal.aggregate([{ $match: { status: 'pending' } }, { $group: { _id: null, t: { $sum: '$amountPaise' } } }]),
+        // Payout totals use the net amount (after withdrawal tax); old records have no netPaise.
+        Withdrawal.aggregate([{ $match: { status: 'pending' } }, { $group: { _id: null, t: { $sum: { $ifNull: ['$netPaise', '$amountPaise'] } } } }]),
         Purchase.aggregate([
           { $group: { _id: '$productId', n: { $sum: 1 }, revenue: { $sum: '$pricePaise' }, name: { $last: '$productName' } } },
           { $sort: { n: -1 } },
@@ -176,7 +177,7 @@ router.get(
         User.countDocuments(),
         User.aggregate([{ $group: { _id: null, t: { $sum: '$balancePaise' } } }]),
         sumBy({ mode: 'Recharge' }),
-        Withdrawal.aggregate([{ $match: { status: 'approved' } }, { $group: { _id: null, t: { $sum: '$amountPaise' } } }]),
+        Withdrawal.aggregate([{ $match: { status: 'approved' } }, { $group: { _id: null, t: { $sum: { $ifNull: ['$netPaise', '$amountPaise'] } } } }]),
         Transaction.aggregate([
           { $match: { createdAt: { $gte: new Date(now - DAY) } } },
           { $group: { _id: { $dateToString: { format: '%Y-%m-%dT%H', date: '$createdAt', timezone: TIMEZONE } }, n: { $sum: 1 } } },
@@ -586,6 +587,9 @@ router.post(
       referralLevel3: pct(req.body.referralLevel3),
       minWithdrawPaise: money(req.body.minWithdraw),
       signupBonusPaise: money(req.body.signupBonus),
+      withdrawTaxPercent: pct(req.body.withdrawTaxPercent),
+      // Keep the admin's line breaks; only trim the ends and cap the size.
+      terms: String(req.body.terms ?? '').replace(/\r\n/g, '\n').trim().slice(0, 50000),
     });
     await s.save();
     go(res, '/admin/settings', 'Settings saved');

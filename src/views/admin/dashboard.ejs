@@ -145,8 +145,8 @@
               <a href="/admin/users/<%= w.userId %>" class="fw-semibold text-body d-block text-truncate"><%= u ? u.name : '#' + w.userId %></a>
               <div class="small text-muted text-truncate">#<%= w.id %> · <%= w.bank && w.bank.bankName %></div>
             </div>
-            <div class="fw-bold me-2"><%= money(w.amountPaise) %></div>
-            <form method="post" action="/admin/withdrawals/<%= w.id %>/approve" data-confirm="Approve withdrawal #<%= w.id %>? Make sure you have paid the user.">
+            <div class="fw-bold me-2 text-end lh-sm"><%= money(w.netPaise ?? w.amountPaise) %><% if (w.taxPaise) { %><div class="small text-muted fw-normal">to pay</div><% } %></div>
+            <form method="post" action="/admin/withdrawals/<%= w.id %>/approve" data-confirm="Approve withdrawal #<%= w.id %>? Make sure you have paid the user <%= money(w.netPaise ?? w.amountPaise) %>.">
               <input type="hidden" name="back" value="/admin/">
               <button class="btn btn-sm btn-outline-light">Approve</button>
             </form>

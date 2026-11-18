@@ -12,6 +12,8 @@ const schema = new mongoose.Schema(
     referralLevel2: { type: Number, default: 5 },
     referralLevel3: { type: Number, default: 2 },
     minWithdrawPaise: { type: Number, default: 20000 },
+    withdrawTaxPercent: { type: Number, default: 0, min: 0, max: 100 }, // deducted from each withdrawal
+    terms: { type: String, default: '' }, // Terms & Conditions shown in the app and at /terms
     signupBonusPaise: { type: Number, default: 0 },
   },
   { timestamps: true }

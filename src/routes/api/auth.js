@@ -75,6 +75,7 @@ router.post(
       referrerId: referrer ? referrer.id : null,
       question: str(b.question) || undefined,
       answer: str(b.answer) ? await bcrypt.hash(str(b.answer).toLowerCase(), 10) : undefined,
+      termsAcceptedAt: b.accept_terms === true || b.accept_terms === 'true' ? new Date() : undefined,
     });
 
     const settings = await Setting.get();

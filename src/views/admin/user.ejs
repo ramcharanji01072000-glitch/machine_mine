@@ -29,6 +29,7 @@
         <dt class="col-5">Security Q</dt><dd class="col-7"><%= user.question || '-' %></dd>
         <dt class="col-5">Joined</dt><dd class="col-7"><%= dt(user.createdAt) %></dd>
         <dt class="col-5">Last login</dt><dd class="col-7"><%= dt(user.lastLoginAt) %></dd>
+        <dt class="col-5">Accepted T&amp;C</dt><dd class="col-7"><%= user.termsAcceptedAt ? dt(user.termsAcceptedAt) : 'No record' %></dd>
       </dl>
     </div></div>
 
@@ -93,11 +94,11 @@
         <thead><tr><th>#</th><th class="text-end">Amount</th><th>Status</th><th>Requested</th><th>Remark</th><th></th></tr></thead>
         <tbody>
         <% withdrawals.forEach((w) => { %>
-          <tr><td><%= w.id %></td><td class="text-end">₹<%= fmt(w.amountPaise) %></td>
+          <tr><td><%= w.id %></td><td class="text-end">₹<%= fmt(w.netPaise ?? w.amountPaise) %><% if (w.taxPaise) { %><br><small class="text-muted">of ₹<%= fmt(w.amountPaise) %> · tax ₹<%= fmt(w.taxPaise) %></small><% } %></td>
             <td><span class="badge text-bg-<%= { pending: 'warning', approved: 'success', rejected: 'danger' }[w.status] %>"><%= w.status %></span></td>
             <td><%= dt(w.createdAt) %></td><td><%= w.remark || '' %></td>
             <td><% if (w.status === 'pending') { %>
-              <form method="post" action="/admin/withdrawals/<%= w.id %>/approve" class="d-inline" data-confirm="Approve? Make sure you have paid the user.">
+              <form method="post" action="/admin/withdrawals/<%= w.id %>/approve" class="d-inline" data-confirm="Approve? Make sure you have paid the user ₹<%= fmt(w.netPaise ?? w.amountPaise) %>.">
                 <input type="hidden" name="back" value="/admin/users/<%= user.id %>"><button class="btn btn-sm btn-success">Approve</button></form>
               <form method="post" action="/admin/withdrawals/<%= w.id %>/reject" class="d-inline" data-confirm="Reject and refund to wallet?">
                 <input type="hidden" name="back" value="/admin/users/<%= user.id %>"><button class="btn btn-sm btn-outline-danger">Reject</button></form>

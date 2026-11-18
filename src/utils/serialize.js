@@ -79,6 +79,9 @@ function withdrawal(w) {
     userId: w.userId,
     bankId: w.bankId,
     amount: fmt(w.amountPaise),
+    tax_percent: w.taxPercent || 0,
+    tax: fmt(w.taxPaise || 0),
+    net_amount: fmt(w.netPaise ?? w.amountPaise),
     transactionNumber: w.transactionNumber,
     status: w.status,
     remark: w.remark || null,
@@ -113,6 +116,8 @@ function appInfo(s) {
     referral_level2: s.referralLevel2,
     referral_level3: s.referralLevel3,
     min_withdraw: fmt(s.minWithdrawPaise),
+    withdraw_tax_percent: s.withdrawTaxPercent || 0,
+    terms: s.terms || '',
     created_at: iso(s.createdAt),
   };
 }

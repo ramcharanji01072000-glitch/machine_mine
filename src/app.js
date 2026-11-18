@@ -47,6 +47,16 @@ app.get('/signup/:code', async (req, res, next) => {
   }
 });
 
+// Public Terms & Conditions page (text is managed in Admin → Settings).
+app.get('/terms', async (req, res, next) => {
+  try {
+    const s = await Setting.get();
+    res.render('terms', { terms: s.terms || '', updatedAt: s.updatedAt });
+  } catch (e) {
+    next(e);
+  }
+});
+
 // ---- Admin panel ----
 app.use('/admin', require('./routes/admin'));
 app.get('/', (req, res) => res.redirect('/admin'));

@@ -17,6 +17,7 @@ const schema = new mongoose.Schema(
     isBlocked: { type: Boolean, default: false },
     tokenVersion: { type: Number, default: 0 }, // bump to invalidate issued tokens
     lastLoginAt: Date,
+    termsAcceptedAt: Date, // set when the user agreed to the Terms & Conditions at signup
   },
   { timestamps: true, id: false }
 );
