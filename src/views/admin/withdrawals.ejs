@@ -16,7 +16,12 @@
       <td><a href="/admin/users/<%= w.userId %>"><%= u ? u.name : '#' + w.userId %></a><br><small class="text-muted"><%= u ? u.mobile : '' %></small></td>
       <% const net = w.netPaise ?? w.amountPaise; %>
       <td class="text-end">₹<%= fmt(w.amountPaise) %></td>
-      <td class="text-end text-muted"><% if (w.taxPaise) { %>−₹<%= fmt(w.taxPaise) %> <small>(<%= w.taxPercent %>%)</small><% } else { %>—<% } %></td>
+      <td class="text-end text-muted small lh-sm">
+        <% if (w.taxes && w.taxes.length) { %>
+          <% w.taxes.forEach((t) => { %><div><%= t.name %> −₹<%= fmt(t.amountPaise) %></div><% }) %>
+          <% if (w.taxes.length > 1) { %><div class="fw-semibold" style="color:var(--text)">−₹<%= fmt(w.taxPaise) %></div><% } %>
+        <% } else if (w.taxPaise) { %>−₹<%= fmt(w.taxPaise) %> (<%= w.taxPercent %>%)<% } else { %>—<% } %>
+      </td>
       <td class="text-end fw-bold" style="color:#4ade80">₹<%= fmt(net) %></td>
       <td><%= w.bank.fullName %><br><small class="text-muted"><%= w.bank.bankName %></small></td>
       <td><code><%= w.bank.bankAccount %></code></td>

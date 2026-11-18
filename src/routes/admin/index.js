@@ -13,6 +13,26 @@ const TIMEZONE = process.env.ADMIN_TIMEZONE || 'Asia/Kolkata';
 const str = (v) => (v === undefined || v === null ? '' : String(v).trim());
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+// Withdrawal taxes from the settings form: repeated taxName / taxType / taxValue fields.
+// Empty or zero rows are dropped; ₹ amounts are stored in paise, % clamped to 0-100.
+const MAX_TAXES = 10;
+function parseTaxes(body) {
+  const list = (v) => (Array.isArray(v) ? v : v === undefined ? [] : [v]);
+  const names = list(body.taxName);
+  const types = list(body.taxType);
+  const values = list(body.taxValue);
+  const taxes = [];
+  names.forEach((n, i) => {
+    const name = str(n).slice(0, 40);
+    const type = types[i] === 'percent' ? 'percent' : 'fixed';
+    const raw = Number(values[i]);
+    if (!name || !Number.isFinite(raw) || raw <= 0) return;
+    const value = type === 'percent' ? Math.min(100, Math.round(raw * 100) / 100) : toPaise(raw);
+    if (value > 0 && taxes.length < MAX_TAXES) taxes.push({ name, type, value });
+  });
+  return taxes;
+}
+
 // Redirect with a flash message shown by the layout.
 function go(res, url, msg, isError = false) {
   const sep = url.includes('?') ? '&' : '?';
@@ -560,7 +580,10 @@ router.post(
 // ---------- Settings ----------
 router.get(
   '/settings',
-  wrap(async (req, res) => res.render('admin/settings', { s: await Setting.get() }))
+  wrap(async (req, res) => {
+    const s = await Setting.get();
+    res.render('admin/settings', { s, taxes: Setting.withdrawTaxesOf(s) });
+  })
 );
 
 router.post(
@@ -587,7 +610,8 @@ router.post(
       referralLevel3: pct(req.body.referralLevel3),
       minWithdrawPaise: money(req.body.minWithdraw),
       signupBonusPaise: money(req.body.signupBonus),
-      withdrawTaxPercent: pct(req.body.withdrawTaxPercent),
+      withdrawTaxes: parseTaxes(req.body),
+      withdrawTaxPercent: 0, // legacy single tax, now part of withdrawTaxes
       // Keep the admin's line breaks; only trim the ends and cap the size.
       terms: String(req.body.terms ?? '').replace(/\r\n/g, '\n').trim().slice(0, 50000),
     });

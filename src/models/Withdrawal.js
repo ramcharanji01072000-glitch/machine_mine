@@ -7,8 +7,13 @@ const schema = new mongoose.Schema(
     bankId: Number,
     bank: { bankName: String, bankAccount: String, fullName: String, ifsc: String, phoneNumber: String },
     amountPaise: { type: Number, required: true }, // gross: debited from the wallet
-    taxPercent: { type: Number, default: 0 }, // rate applied at request time
-    taxPaise: { type: Number, default: 0 },
+    taxPercent: { type: Number, default: 0 }, // legacy: single % rate (older requests)
+    // Itemised taxes applied at request time (snapshot; later setting changes don't affect it).
+    taxes: {
+      type: [{ _id: false, name: String, type: { type: String }, value: Number, amountPaise: Number }],
+      default: undefined,
+    },
+    taxPaise: { type: Number, default: 0 }, // total of all taxes
     netPaise: Number, // amount to actually pay the user (gross - tax); missing on old records = gross
     transactionNumber: String,
     status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending', index: true },

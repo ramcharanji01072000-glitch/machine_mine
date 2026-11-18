@@ -74,15 +74,14 @@ router.post(
     const bank = await Bank.findOne({ userId: req.user.id });
     if (!bank) return fail(res, 'Please add your bank details first');
 
-    // Tax is deducted from the withdrawal: the wallet is debited the full amount,
-    // the user is paid amount - tax. Rate is snapshotted on the request.
-    const taxPercent = settings.withdrawTaxPercent || 0;
-    const tax = Math.round((amount * taxPercent) / 100);
-    const net = amount - tax;
-    if (net <= 0) return fail(res, 'Amount is too small after tax');
+    // Taxes are deducted from the withdrawal: the wallet is debited the full amount,
+    // the user is paid amount - taxes. The itemised taxes are snapshotted on the request.
+    const { items, total: tax, net } = Setting.applyWithdrawTaxes(Setting.withdrawTaxesOf(settings), amount);
+    if (net <= 0) return fail(res, `Amount is too small: taxes total ${fmt(tax)}`);
+    const taxNote = items.map((t) => `${t.name} ${fmt(t.amountPaise)}`).join(', ');
 
     const txn = await debit(req.user.id, amount, 'Withdraw', {
-      note: tax > 0 ? `Withdraw request · tax ${taxPercent}% (${fmt(tax)}) · payable ${fmt(net)}` : 'Withdraw request',
+      note: tax > 0 ? `Withdraw request · ${taxNote} · payable ${fmt(net)}` : 'Withdraw request',
     });
     if (!txn) return fail(res, 'Insufficient Balance');
 
@@ -97,7 +96,7 @@ router.post(
         phoneNumber: bank.phoneNumber,
       },
       amountPaise: amount,
-      taxPercent,
+      taxes: items,
       taxPaise: tax,
       netPaise: net,
       transactionNumber: str(b.transactionNumber).slice(0, 64) || undefined,
@@ -107,7 +106,7 @@ router.post(
     return ok(
       res,
       tax > 0
-        ? `Withdraw request submitted. You will receive ${fmt(net)} after ${taxPercent}% tax.`
+        ? `Withdraw request submitted. You will receive ${fmt(net)} after taxes (${taxNote}).`
         : 'Withdraw request submitted successfully',
       serialize.withdrawal(withdrawal)
     );

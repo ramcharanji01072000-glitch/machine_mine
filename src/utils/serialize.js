@@ -1,7 +1,12 @@
 // Shapes documents exactly as the Flutter models (lib/data/model/response/*) expect.
 const { fmt } = require('./money');
 
+const Setting = require('../models/Setting');
+
 const iso = (d) => (d ? new Date(d).toISOString() : null);
+
+// Human label for a tax's rate: "₹10.00" or "2%".
+const taxRate = (t) => (t.type === 'fixed' ? `₹${fmt(t.value)}` : `${t.value}%`);
 
 function user(u, token) {
   const out = {
@@ -80,6 +85,10 @@ function withdrawal(w) {
     bankId: w.bankId,
     amount: fmt(w.amountPaise),
     tax_percent: w.taxPercent || 0,
+    taxes: (w.taxes && w.taxes.length
+      ? w.taxes
+      : w.taxPaise ? [{ name: 'Tax', type: 'percent', value: w.taxPercent, amountPaise: w.taxPaise }] : []
+    ).map((t) => ({ name: t.name, type: t.type, rate: taxRate(t), amount: fmt(t.amountPaise) })),
     tax: fmt(w.taxPaise || 0),
     net_amount: fmt(w.netPaise ?? w.amountPaise),
     transactionNumber: w.transactionNumber,
@@ -116,7 +125,14 @@ function appInfo(s) {
     referral_level2: s.referralLevel2,
     referral_level3: s.referralLevel3,
     min_withdraw: fmt(s.minWithdrawPaise),
-    withdraw_tax_percent: s.withdrawTaxPercent || 0,
+    // [{ name, type: 'fixed'|'percent', value }] — value is rupees for fixed, % for percent.
+    withdraw_taxes: Setting.withdrawTaxesOf(s).map((t) => ({
+      name: t.name,
+      type: t.type,
+      value: t.type === 'fixed' ? Number(fmt(t.value)) : t.value,
+    })),
+    // Legacy (older app builds): sum of percentage taxes only.
+    withdraw_tax_percent: Setting.withdrawTaxesOf(s).filter((t) => t.type === 'percent').reduce((a, t) => a + t.value, 0),
     terms: s.terms || '',
     created_at: iso(s.createdAt),
   };
