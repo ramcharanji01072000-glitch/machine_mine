@@ -1,0 +1,59 @@
+<%- include('partials/header', { title: 'Notices & offers' }) %>
+<%- include('partials/notice-style') %>
+<%
+  const icons = { offer: '🎁', notice: '📢', alert: '⚠️' };
+  const actionLabel = { none: '', products: 'Machines', welfare: 'Welfare', machines: 'My machines', withdraw: 'Withdraw', recharge: 'Recharge', invite: 'Invite', team: 'Team', link: 'Link' };
+%>
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+  <p class="text-muted small m-0 me-auto" style="max-width:640px">
+    Live notices appear on the app's Home screen in this order. Schedule offers with start/end times — they appear and expire automatically.
+    <b>Pop-up</b> notices open as a banner with a close button when the app launches (every launch, or once per user).
+  </p>
+  <a href="/admin/notices/new" class="btn btn-primary">+ New notice</a>
+</div>
+
+<div class="row g-3">
+  <% notices.forEach((n) => { const st = n.state(); %>
+    <div class="col-md-6 col-xl-4">
+      <div class="card h-100"><div class="card-body d-flex flex-column gap-3">
+        <div class="nt-card nt-<%= n.type %>" style="<%= st === 'live' ? '' : 'opacity:.55' %>">
+          <div class="nt-icon"><%= icons[n.type] %></div>
+          <div class="flex-grow-1 overflow-hidden">
+            <div class="nt-tag"><%= n.type %></div>
+            <div class="nt-title"><%= n.title %></div>
+            <% if (n.message) { %><div class="nt-msg"><%= n.message %></div><% } %>
+            <% if (n.ctaAction !== 'none') { %><span class="nt-cta"><%= n.ctaLabel || 'Open' %> →</span><% } %>
+          </div>
+          <% if (n.image) { %><img class="nt-img" src="<%= n.image %>" alt=""><% } %>
+        </div>
+        <div class="d-flex flex-wrap gap-2 align-items-center small">
+          <span class="state state-<%= st %>"><%= { live: 'Live', scheduled: 'Scheduled', expired: 'Expired', off: 'Off' }[st] %></span>
+          <% if (n.popup) { %><span class="state" style="background:rgba(139,92,246,.15);color:#c4b5fd">Pop-up · <%= n.popupOnce ? 'once' : 'every launch' %></span><% } %>
+          <% if (n.ctaAction !== 'none') { %><span class="text-muted">→ <%= actionLabel[n.ctaAction] %></span><% } %>
+          <span class="text-muted ms-auto">#<%= n.sortOrder %></span>
+        </div>
+        <div class="small text-muted">
+          <%= n.startsAt ? 'From ' + dt(n.startsAt) : 'From now' %> · <%= n.endsAt ? 'until ' + dt(n.endsAt) : 'no end date' %>
+        </div>
+        <div class="d-flex gap-2 mt-auto">
+          <a href="/admin/notices/<%= n.id %>/edit" class="btn btn-sm btn-outline-light flex-grow-1">Edit</a>
+          <form method="post" action="/admin/notices/<%= n.id %>/toggle" class="flex-grow-1">
+            <button class="btn btn-sm btn-outline-light w-100"><%= n.isActive ? 'Switch off' : 'Switch on' %></button>
+          </form>
+          <form method="post" action="/admin/notices/<%= n.id %>/delete" data-confirm="Delete this notice?">
+            <button class="btn btn-sm btn-outline-danger">Delete</button>
+          </form>
+        </div>
+      </div></div>
+    </div>
+  <% }) %>
+  <% if (!notices.length) { %>
+    <div class="col-12"><div class="card"><div class="card-body text-center py-5">
+      <div style="font-size:40px">📢</div>
+      <div class="fw-bold mt-2">No notices yet</div>
+      <div class="text-muted small mb-3">Announce new machines, limited-time offers or maintenance alerts.</div>
+      <a href="/admin/notices/new" class="btn btn-primary">Create the first notice</a>
+    </div></div></div>
+  <% } %>
+</div>
+<%- include('partials/footer') %>

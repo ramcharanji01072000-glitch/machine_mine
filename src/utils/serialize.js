@@ -113,6 +113,24 @@ function carousel(c) {
   };
 }
 
+function notice(n) {
+  return {
+    id: n.id,
+    title: n.title,
+    message: n.message || '',
+    type: n.type,
+    image: n.image || null,
+    cta_label: n.ctaAction && n.ctaAction !== 'none' ? n.ctaLabel || null : null,
+    cta_action: n.ctaAction || 'none',
+    cta_link: n.ctaAction === 'link' ? n.ctaLink || null : null,
+    starts_at: iso(n.startsAt),
+    ends_at: iso(n.endsAt),
+    popup: !!n.popup,
+    popup_once: !!n.popupOnce,
+    updated_at: iso(n.updatedAt),
+  };
+}
+
 function appInfo(s) {
   return {
     id: 1,
@@ -138,4 +156,4 @@ function appInfo(s) {
   };
 }
 
-module.exports = { user, product, purchase, transaction, bank, withdrawal, carousel, appInfo, iso };
+module.exports = { user, product, purchase, transaction, bank, withdrawal, carousel, notice, appInfo, iso };

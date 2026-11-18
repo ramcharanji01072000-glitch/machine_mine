@@ -6,6 +6,7 @@ module.exports = {
   Bank: require('./Bank'),
   Withdrawal: require('./Withdrawal'),
   Carousel: require('./Carousel'),
+  Notice: require('./Notice'),
   Setting: require('./Setting'),
   Admin: require('./Admin'),
 };

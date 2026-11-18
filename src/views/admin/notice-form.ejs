@@ -1,0 +1,123 @@
+<%- include('partials/header', { title: notice ? `Edit notice #${notice.id}` : 'New notice' }) %>
+<%- include('partials/notice-style') %>
+<%
+  const n = notice || {};
+  const actionNames = { none: 'No button', products: 'Open Machines', welfare: 'Open Welfare machines', machines: 'Open My machines',
+    withdraw: 'Open Withdraw', recharge: 'Open Recharge', invite: 'Open Invite', team: 'Open Team', link: 'Copy a link' };
+%>
+<div class="row g-4">
+  <div class="col-lg-7">
+    <form method="post" enctype="multipart/form-data" action="/admin/notices<%= notice ? '/' + notice.id : '' %>" class="card card-body" id="ntForm">
+      <div class="row g-3">
+        <div class="col-12">
+          <label class="form-label">Type</label>
+          <div class="btn-group w-100" role="group">
+            <% types.forEach((t) => { %>
+              <input type="radio" class="btn-check" name="type" id="type-<%= t %>" value="<%= t %>" <%= (n.type || 'notice') === t ? 'checked' : '' %>>
+              <label class="btn btn-outline-dark text-capitalize" for="type-<%= t %>"><%= { offer: '🎁 Offer', notice: '📢 Notice', alert: '⚠️ Alert' }[t] %></label>
+            <% }) %>
+          </div>
+        </div>
+        <div class="col-12"><label class="form-label">Title</label>
+          <input name="title" class="form-control" maxlength="80" required value="<%= n.title || '' %>" placeholder="e.g. 20% extra return on Pro Miner this week"></div>
+        <div class="col-12"><label class="form-label">Message</label>
+          <textarea name="message" rows="4" maxlength="1000" class="form-control" placeholder="Details users see when they tap the notice"><%= n.message || '' %></textarea></div>
+
+        <div class="col-md-6"><label class="form-label">Button</label>
+          <select name="ctaAction" class="form-select" id="ctaAction">
+            <% actions.forEach((a) => { %><option value="<%= a %>" <%= (n.ctaAction || 'none') === a ? 'selected' : '' %>><%= actionNames[a] %></option><% }) %>
+          </select></div>
+        <div class="col-md-6 cta-only"><label class="form-label">Button text</label>
+          <input name="ctaLabel" class="form-control" maxlength="30" value="<%= n.ctaLabel || '' %>" placeholder="e.g. Buy now"></div>
+        <div class="col-12 link-only"><label class="form-label">Link</label>
+          <input name="ctaLink" type="url" class="form-control" value="<%= n.ctaLink || '' %>" placeholder="https://…">
+          <div class="form-text">The app copies this link for the user (e.g. a Telegram post).</div></div>
+
+        <div class="col-md-6"><label class="form-label">Starts</label>
+          <input name="startsAt" type="datetime-local" class="form-control" value="<%= toLocalInput(n.startsAt) %>">
+          <div class="form-text">Empty = immediately</div></div>
+        <div class="col-md-6"><label class="form-label">Ends</label>
+          <input name="endsAt" type="datetime-local" class="form-control" value="<%= toLocalInput(n.endsAt) %>">
+          <div class="form-text">Empty = no end. Offers show an "Ends in…" countdown.</div></div>
+
+        <div class="col-12"><label class="form-label">Image <span class="text-muted">(optional)</span></label>
+          <% if (n.image) { %>
+            <div class="d-flex align-items-center gap-3 mb-2">
+              <img src="<%= n.image %>" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:12px">
+              <div class="form-check"><input class="form-check-input" type="checkbox" name="removeImage" id="rmi"><label class="form-check-label" for="rmi">Remove image</label></div>
+            </div>
+          <% } %>
+          <input name="image" type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="form-control" id="ntImage"></div>
+
+        <div class="col-md-4"><label class="form-label">Order</label>
+          <input name="sortOrder" type="number" class="form-control" value="<%= n.sortOrder || 0 %>">
+          <div class="form-text">Lower shows first</div></div>
+        <div class="col-md-8 d-flex flex-column justify-content-center gap-2 pt-md-3">
+          <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="isActive" id="act" <%= !notice || n.isActive ? 'checked' : '' %>>
+            <label class="form-check-label" for="act">Active (visible in the app during its schedule)</label></div>
+          <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="popup" id="pop" <%= !notice || n.popup ? 'checked' : '' %>>
+            <label class="form-check-label" for="pop">Show as pop-up banner when the app launches (with a close button)</label></div>
+          <div class="d-flex gap-3 ps-4 small" id="popFreq">
+            <div class="form-check"><input class="form-check-input" type="radio" name="popupFrequency" id="pf-every" value="every" <%= !n.popupOnce ? 'checked' : '' %>>
+              <label class="form-check-label" for="pf-every">Every app launch</label></div>
+            <div class="form-check"><input class="form-check-input" type="radio" name="popupFrequency" id="pf-once" value="once" <%= n.popupOnce ? 'checked' : '' %>>
+              <label class="form-check-label" for="pf-once">Only once per user</label></div>
+          </div>
+        </div>
+      </div>
+      <div class="d-flex gap-2 mt-4">
+        <button class="btn btn-primary"><%= notice ? 'Save notice' : 'Publish notice' %></button>
+        <a href="/admin/notices" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card" style="position:sticky;top:20px"><div class="card-body">
+      <div class="fw-bold mb-1">Preview</div>
+      <div class="text-muted small mb-3">How it appears on the app's Home screen</div>
+      <div class="nt-card" id="pv">
+        <div class="nt-icon" id="pvIcon"></div>
+        <div class="flex-grow-1 overflow-hidden">
+          <div class="nt-tag" id="pvTag"></div>
+          <div class="nt-title" id="pvTitle"></div>
+          <div class="nt-msg" id="pvMsg"></div>
+          <span class="nt-cta" id="pvCta"></span>
+        </div>
+        <img class="nt-img" id="pvImg" alt="" style="display:none">
+      </div>
+    </div></div>
+  </div>
+</div>
+<script>
+  (function () {
+    const f = document.getElementById('ntForm'), $ = (id) => document.getElementById(id);
+    const icons = { offer: '🎁', notice: '📢', alert: '⚠️' };
+    let imgUrl = <%- JSON.stringify(n.image || '') %>;
+    const render = () => {
+      const type = (f.querySelector('[name=type]:checked') || {}).value || 'notice';
+      const action = $('ctaAction').value;
+      $('pv').className = 'nt-card nt-' + type;
+      $('pvIcon').textContent = icons[type];
+      $('pvTag').textContent = type;
+      $('pvTitle').textContent = f.title.value.trim() || 'Your title';
+      $('pvMsg').textContent = f.message.value.trim();
+      $('pvMsg').style.display = f.message.value.trim() ? '' : 'none';
+      $('pvCta').textContent = (f.ctaLabel.value.trim() || 'Open') + ' →';
+      $('pvCta').style.display = action === 'none' ? 'none' : '';
+      document.querySelectorAll('.cta-only').forEach((e) => (e.style.display = action === 'none' ? 'none' : ''));
+      document.querySelectorAll('.link-only').forEach((e) => (e.style.display = action === 'link' ? '' : 'none'));
+      $('popFreq').style.display = f.popup.checked ? '' : 'none';
+      const rm = f.querySelector('[name=removeImage]');
+      $('pvImg').style.display = imgUrl && !(rm && rm.checked) ? '' : 'none';
+      if (imgUrl) $('pvImg').src = imgUrl;
+    };
+    $('ntImage').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      imgUrl = file ? URL.createObjectURL(file) : <%- JSON.stringify(n.image || '') %>;
+      render();
+    });
+    f.addEventListener('input', render); f.addEventListener('change', render); render();
+  })();
+</script>
+<%- include('partials/footer') %>

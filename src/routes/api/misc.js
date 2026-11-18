@@ -1,6 +1,6 @@
 // Smaller app endpoints: carousel, app info, amount history, referral summary.
 const express = require('express');
-const { Carousel, Setting, Transaction, User } = require('../../models');
+const { Carousel, Setting, Transaction, User, Notice } = require('../../models');
 const { ok, fail, wrap } = require('../../utils/respond');
 const { requireUser } = require('../../middleware/auth');
 const serialize = require('../../utils/serialize');
@@ -12,6 +12,16 @@ cs.get(
   wrap(async (req, res) => {
     const slides = await Carousel.find({ status: true }).sort({ order: 1, createdAt: -1 });
     return ok(res, 'Carousel fetched', slides.map(serialize.carousel));
+  })
+);
+
+// /api/v1/nt — offers / notices / alerts that are live right now (public).
+const nt = express.Router();
+nt.get(
+  '/active',
+  wrap(async (req, res) => {
+    const list = await Notice.find(Notice.liveFilter()).sort({ sortOrder: 1, createdAt: -1 }).limit(20);
+    return ok(res, 'Notices fetched', list.map(serialize.notice));
   })
 );
 
@@ -96,4 +106,4 @@ rf.get(
 
 const dbl = (paise) => `__dbl__${(paise / 100).toFixed(2)}`;
 
-module.exports = { cs, dt, am, rf };
+module.exports = { cs, nt, dt, am, rf };

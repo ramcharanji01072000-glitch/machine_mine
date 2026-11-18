@@ -136,6 +136,11 @@
   .btn-group { padding: 4px; border-radius: 16px; background: rgba(255, 255, 255, .04); border: 1px solid var(--line); }
   .btn-group > .btn:not(.active) { background: transparent; border-color: transparent; }
   .btn-group > .btn.active { box-shadow: 0 6px 18px var(--glow); }
+  /* Radio-style groups (btn-check) mark the selection with :checked instead of .active. */
+  .btn-group > .btn-check:checked + .btn {
+    background: var(--primary) !important; border-color: var(--primary) !important; color: #fff !important;
+    box-shadow: 0 6px 18px var(--glow);
+  }
   .btn-success { --bs-btn-bg: #16a34a; --bs-btn-border-color: #16a34a; --bs-btn-hover-bg: #22c55e; --bs-btn-hover-border-color: #22c55e; }
 
   /* ---------- Forms ---------- */

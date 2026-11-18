@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
-const { User, Product, Purchase, Transaction, Bank, Withdrawal, Carousel, Setting, Admin } = require('../../models');
+const { User, Product, Purchase, Transaction, Bank, Withdrawal, Carousel, Notice, Setting, Admin } = require('../../models');
 const { requireAdmin, setAdminCookie, ADMIN_COOKIE } = require('../../middleware/auth');
 const { upload, publicPath, removeUpload } = require('../../middleware/upload');
 const { credit, debit } = require('../../services/wallet');
@@ -91,6 +91,7 @@ router.use(requireAdmin);
 router.use(
   wrap(async (req, res, next) => {
     res.locals.pendingWithdrawals = await Withdrawal.countDocuments({ status: 'pending' });
+    res.locals.liveNotices = await Notice.countDocuments(Notice.liveFilter());
     const hour = Number(new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: TIMEZONE })) % 24;
     res.locals.greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
     res.locals.today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: TIMEZONE });
@@ -515,6 +516,129 @@ router.get(
       modes: Transaction.MODES,
       userMap: await usersById(transactions.map((t) => t.userId)),
     });
+  })
+);
+
+// ---------- Notices (offers / notices / alerts shown on the app's Home) ----------
+// <input type="datetime-local"> values ("YYYY-MM-DDTHH:mm") are in the admin timezone.
+function tzOffsetMs(d) {
+  return new Date(d.toLocaleString('en-US', { timeZone: TIMEZONE })) - new Date(d.toLocaleString('en-US', { timeZone: 'UTC' }));
+}
+function fromLocalInput(v) {
+  const s = str(v);
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s)) return null;
+  const asUtc = new Date(`${s}:00Z`);
+  return new Date(asUtc.getTime() - tzOffsetMs(asUtc));
+}
+function toLocalInput(d) {
+  if (!d) return '';
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: TIMEZONE, year: 'numeric', month: '2-digit',
+    day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(d)).map((x) => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
+}
+
+function noticeFields(body) {
+  const data = {
+    title: str(body.title).slice(0, 80),
+    message: String(body.message ?? '').replace(/\r\n/g, '\n').trim().slice(0, 1000),
+    type: Notice.TYPES.includes(body.type) ? body.type : 'notice',
+    ctaAction: Notice.ACTIONS.includes(body.ctaAction) ? body.ctaAction : 'none',
+    ctaLabel: str(body.ctaLabel).slice(0, 30),
+    ctaLink: str(body.ctaLink).slice(0, 500),
+    startsAt: fromLocalInput(body.startsAt),
+    endsAt: fromLocalInput(body.endsAt),
+    popup: body.popup === 'on',
+    popupOnce: body.popupFrequency === 'once',
+    isActive: body.isActive === 'on',
+    sortOrder: parseInt(body.sortOrder, 10) || 0,
+  };
+  if (!data.title) return [null, 'Title is required'];
+  if (data.startsAt && data.endsAt && data.endsAt <= data.startsAt) return [null, 'End time must be after the start time'];
+  if (data.ctaAction === 'link' && !/^https?:\/\//i.test(data.ctaLink)) return [null, 'Enter a link starting with http:// or https://'];
+  if (data.ctaAction !== 'none' && !data.ctaLabel) data.ctaLabel = 'Open';
+  return [data, null];
+}
+
+router.get(
+  '/notices',
+  wrap(async (req, res) => {
+    const notices = await Notice.find().sort({ isActive: -1, sortOrder: 1, createdAt: -1 });
+    res.render('admin/notices', { notices });
+  })
+);
+
+router.get('/notices/new', (req, res) =>
+  res.render('admin/notice-form', { notice: null, toLocalInput, types: Notice.TYPES, actions: Notice.ACTIONS }));
+
+router.get(
+  '/notices/:id/edit',
+  wrap(async (req, res) => {
+    const notice = await Notice.findOne({ id: Number(req.params.id) });
+    if (!notice) throw new HttpError('Notice not found', 404);
+    res.render('admin/notice-form', { notice, toLocalInput, types: Notice.TYPES, actions: Notice.ACTIONS });
+  })
+);
+
+router.post(
+  '/notices',
+  upload.single('image'),
+  wrap(async (req, res) => {
+    const [data, error] = noticeFields(req.body);
+    if (error) {
+      if (req.file) removeUpload(publicPath(req.file));
+      return go(res, '/admin/notices/new', error, true);
+    }
+    await Notice.create({ ...data, image: publicPath(req.file) || undefined });
+    go(res, '/admin/notices', 'Notice published');
+  })
+);
+
+async function loadNotice(req) {
+  const notice = await Notice.findOne({ id: Number(req.params.id) });
+  if (!notice) throw new HttpError('Notice not found', 404);
+  return notice;
+}
+
+router.post(
+  '/notices/:id',
+  upload.single('image'),
+  wrap(async (req, res) => {
+    const notice = await loadNotice(req);
+    const [data, error] = noticeFields(req.body);
+    if (error) {
+      if (req.file) removeUpload(publicPath(req.file));
+      return go(res, `/admin/notices/${notice.id}/edit`, error, true);
+    }
+    if (req.file) {
+      removeUpload(notice.image);
+      data.image = publicPath(req.file);
+    } else if (req.body.removeImage === 'on') {
+      removeUpload(notice.image);
+      data.image = undefined;
+    }
+    Object.assign(notice, data);
+    await notice.save();
+    go(res, '/admin/notices', 'Notice updated');
+  })
+);
+
+router.post(
+  '/notices/:id/toggle',
+  wrap(async (req, res) => {
+    const notice = await loadNotice(req);
+    notice.isActive = !notice.isActive;
+    await notice.save();
+    go(res, '/admin/notices', notice.isActive ? 'Notice switched on' : 'Notice switched off');
+  })
+);
+
+router.post(
+  '/notices/:id/delete',
+  wrap(async (req, res) => {
+    const notice = await loadNotice(req);
+    removeUpload(notice.image);
+    await notice.deleteOne();
+    go(res, '/admin/notices', 'Notice deleted');
   })
 );
 
