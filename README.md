@@ -78,6 +78,12 @@ Every response looks like this: `{ "status": bool, "message": string, "data": an
 | Carousel | Home banner slides (image, caption, order, visibility) |
 | Settings | About Us, app/Telegram links, referral %, minimum withdraw, signup bonus, admin password |
 
+## UPI payment gateway
+
+Wallet recharge by UPI through a self-hosted [YouPI-PG](https://github.com/youpi-pg/YouPI-PG) instance
+(admin → **Payment gateway**, with a live **Check integration**). Setup and flow:
+[docs/PAYMENT_GATEWAY.md](docs/PAYMENT_GATEWAY.md).
+
 ## Notes for the Flutter app
 
 1. `AppConstants.baseUrl` is set to the emulator address. Change it to your server URL for real devices and for release builds.

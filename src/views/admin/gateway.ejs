@@ -1,0 +1,140 @@
+<%- include('partials/header', { title: 'Payment gateway' }) %>
+<%
+  const statusClass = { created: 'secondary', active: 'primary', observed: 'info', manual_review: 'warning', reconciled: 'success', failed: 'danger', expired: 'secondary', cancelled: 'secondary', error: 'danger' };
+  const statusLabel = { created: 'Created', active: 'Awaiting payment', observed: 'Observed', manual_review: 'Manual review', reconciled: 'Reconciled', failed: 'Failed', expired: 'Expired', cancelled: 'Cancelled', error: 'Error' };
+  const configured = g.baseUrl && g.merchantId && g.apiKey && g.webhookSecret;
+  const check = g.lastCheck;
+%>
+<style>
+  .gw-pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 12px; font-weight: 700; font-size: .85rem; }
+  .gw-on { background: rgba(34,197,94,.14); color: #4ade80; } .gw-off { background: rgba(255,255,255,.06); color: #8a93a8; }
+  .chk { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .chk:last-child { border-bottom: 0; }
+  .chk-ic { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; font-weight: 800; font-size: .8rem; }
+  .chk-ok { background: rgba(34,197,94,.16); color: #4ade80; } .chk-bad { background: rgba(239,68,68,.16); color: #f87171; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .85rem; word-break: break-all; }
+  .steps li { margin-bottom: 6px; }
+</style>
+
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+  <span class="gw-pill <%= g.enabled ? 'gw-on' : 'gw-off' %>"><%= g.enabled ? '● Online recharge ON' : '○ Online recharge OFF' %></span>
+  <span class="gw-pill gw-off">Credits wallet on: <b class="ms-1" style="color:var(--text)"><%= g.creditOn === 'observed' ? 'Observed (fast)' : 'Reconciled (safe)' %></b></span>
+  <% if (check) { %><span class="gw-pill <%= check.ok ? 'gw-on' : '' %>" style="<%= check.ok ? '' : 'background:rgba(239,68,68,.12);color:#fca5a5' %>">Last check: <%= check.ok ? 'passed' : 'failed' %> · <%= dt(check.at) %></span><% } %>
+</div>
+
+<div class="row g-4">
+  <div class="col-xl-7">
+    <form method="post" action="/admin/gateway" class="card card-body mb-4" autocomplete="off">
+      <h6 class="mb-1">YouPI connection</h6>
+      <p class="text-muted small">Self-hosted UPI gateway (<a href="https://github.com/youpi-pg/YouPI-PG" target="_blank" rel="noopener">YouPI-PG</a>). Create a merchant in your YouPI instance, then paste its details here.</p>
+      <div class="row g-3">
+        <div class="col-12"><label class="form-label">Gateway URL</label>
+          <input name="baseUrl" class="form-control" placeholder="https://pay.yourdomain.com" value="<%= g.baseUrl || '' %>"></div>
+        <div class="col-md-6"><label class="form-label">Merchant ID</label>
+          <input name="merchantId" class="form-control mono" placeholder="00000000-0000-0000-0000-000000000001" value="<%= g.merchantId || '' %>"></div>
+        <div class="col-md-6"><label class="form-label">Merchant API key <span class="text-muted">(secret)</span></label>
+          <input name="apiKey" type="password" class="form-control mono" autocomplete="new-password" placeholder="<%= masked.apiKey || 'Paste key' %>">
+          <div class="form-text"><%= masked.apiKey ? 'Saved. Leave blank to keep it.' : 'Not set' %></div></div>
+        <div class="col-12"><label class="form-label">Webhook secret <span class="text-muted">(secret)</span></label>
+          <input name="webhookSecret" type="password" class="form-control mono" autocomplete="new-password" placeholder="<%= masked.webhookSecret || 'Paste webhook secret' %>">
+          <div class="form-text"><%= masked.webhookSecret ? 'Saved. Leave blank to keep it.' : 'Not set' %></div></div>
+        <div class="col-md-6"><label class="form-label">Minimum recharge (₹)</label>
+          <input name="min" type="number" step="0.01" min="1" class="form-control" value="<%= fmt(g.minPaise ?? 10000) %>"></div>
+        <div class="col-md-6"><label class="form-label">Maximum recharge (₹)</label>
+          <input name="max" type="number" step="0.01" min="1" class="form-control" value="<%= fmt(g.maxPaise ?? 5000000) %>"></div>
+        <div class="col-12">
+          <label class="form-label">Credit the user's wallet when</label>
+          <div class="form-check"><input class="form-check-input" type="radio" name="creditOn" id="co-r" value="reconciled" <%= g.creditOn !== 'observed' ? 'checked' : '' %>>
+            <label class="form-check-label" for="co-r"><b>Reconciled</b> — after a bank-statement line matches (safe, recommended by YouPI; needs a statement import in YouPI)</label></div>
+          <div class="form-check"><input class="form-check-input" type="radio" name="creditOn" id="co-o" value="observed" <%= g.creditOn === 'observed' ? 'checked' : '' %>>
+            <label class="form-check-label" for="co-o"><b>Observed</b> — as soon as a bank SMS/email alert matches (instant, but not proof of settlement)</label></div>
+        </div>
+        <div class="col-12"><div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="enabled" id="gwOn" <%= g.enabled ? 'checked' : '' %>>
+          <label class="form-check-label" for="gwOn">Enable online UPI recharge in the app</label></div></div>
+      </div>
+      <div class="d-flex gap-2 mt-4"><button class="btn btn-primary">Save settings</button></div>
+    </form>
+
+    <div class="card card-body" id="check">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <h6 class="m-0 me-auto">Check integration</h6>
+        <form method="post" action="/admin/gateway/check"><button class="btn btn-sm btn-primary" <%= configured ? '' : 'disabled' %>>Run check</button></form>
+      </div>
+      <p class="text-muted small mb-2">Tests the saved settings live: gateway health, merchant credentials (no payment is created) and webhook signing.</p>
+      <% if (check) { %>
+        <% check.checks.forEach((c) => { %>
+          <div class="chk">
+            <div class="chk-ic <%= c.ok ? 'chk-ok' : 'chk-bad' %>"><%= c.ok ? '✓' : '✕' %></div>
+            <div class="overflow-hidden"><div class="fw-semibold"><%= c.label %></div><div class="small text-muted mono"><%= c.detail %></div></div>
+          </div>
+        <% }) %>
+      <% } else { %>
+        <div class="text-muted small py-3"><%= configured ? 'Not run yet.' : 'Fill in and save the connection settings first.' %></div>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="col-xl-5">
+    <div class="card card-body mb-4">
+      <h6>Webhook URL</h6>
+      <p class="text-muted small mb-2">Set this as the webhook URL of your merchant in the YouPI merchant admin:</p>
+      <div class="d-flex gap-2 align-items-center">
+        <input class="form-control mono" id="whUrl" readonly value="<%= webhookUrl %>">
+        <button type="button" class="btn btn-outline-light flex-shrink-0" onclick="navigator.clipboard.writeText(document.getElementById('whUrl').value).then(()=>{this.textContent='Copied'})">Copy</button>
+      </div>
+      <ol class="steps small text-muted mt-3 mb-0 ps-3">
+        <li>Deploy YouPI-PG on its own server/domain (it needs Node 24, a persistent disk for SQLite, and its SMS/Gmail/Android observer).</li>
+        <li>In YouPI's merchant admin, create a merchant and copy its <b>Merchant ID</b>, <b>API key</b> and <b>webhook secret</b> here.</li>
+        <li>Paste the webhook URL above into that merchant's webhook setting.</li>
+        <li>Save, run <b>Check integration</b>, then switch <b>Enable online UPI recharge</b> on.</li>
+      </ol>
+    </div>
+    <div class="card card-body">
+      <h6>How payments are credited</h6>
+      <ul class="small text-muted mb-0 ps-3">
+        <li>The user pays on YouPI's checkout page; YouPI sends signed webhooks here.</li>
+        <li>Only verified (HMAC-SHA256) UPI webhooks with the exact order amount can credit — each payment at most once.</li>
+        <li><b>Manual review</b> and mismatched payments are never auto-credited: check your bank statement, then use <b>Credit</b> below.</li>
+        <li>YouPI is an experimental, self-hosted project — reconcile against your bank records.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h5 class="mt-4 mb-3">Recharge payments</h5>
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <a href="/admin/gateway" class="btn btn-sm <%= !query.status ? 'btn-primary' : 'btn-outline-light' %>">All</a>
+  <% ['active', 'observed', 'manual_review', 'reconciled', 'failed', 'expired', 'error'].forEach((st) => { %>
+    <a href="/admin/gateway?status=<%= st %>" class="btn btn-sm <%= query.status === st ? 'btn-primary' : 'btn-outline-light' %>"><%= statusLabel[st] %><% if (counts[st]) { %> <span class="opacity-75">(<%= counts[st] %>)</span><% } %></a>
+  <% }) %>
+</div>
+<div class="card"><div class="table-responsive"><table class="table table-stack table-hover mb-0">
+  <thead><tr><th>#</th><th>User</th><th class="text-end">Amount</th><th>Status</th><th>Credited</th><th>Order / gateway ID</th><th>Created</th><th></th></tr></thead>
+  <tbody>
+  <% payments.forEach((p) => { const u = userMap[p.userId]; %>
+    <tr>
+      <td><%= p.id %></td>
+      <td><a href="/admin/users/<%= p.userId %>"><%= u ? u.name : '#' + p.userId %></a></td>
+      <td class="text-end fw-semibold">₹<%= fmt(p.amountPaise) %></td>
+      <td><span class="badge text-bg-<%= statusClass[p.status] %>"><%= statusLabel[p.status] %></span>
+        <% if (p.error) { %><div class="small text-danger"><%= p.error %></div><% } %></td>
+      <td><% if (p.creditedAt) { %><span class="text-success">✓ <%= dt(p.creditedAt) %></span><div class="small text-muted"><%= p.creditedBy %></div><% } else { %>—<% } %></td>
+      <td class="small mono"><%= p.orderId %><% if (p.gatewayPaymentId) { %><br><span class="text-muted"><%= p.gatewayPaymentId %></span><% } %></td>
+      <td><%= dt(p.createdAt) %></td>
+      <td class="text-end">
+        <% if (p.gatewayPaymentId && !p.creditedAt) { %>
+          <form method="post" action="/admin/gateway/payments/<%= p.id %>/refresh" class="d-inline"><button class="btn btn-sm btn-outline-light">Refresh</button></form>
+        <% } %>
+        <% if (!p.creditedAt && ['observed', 'manual_review', 'reconciled'].includes(p.status)) { %>
+          <form method="post" action="/admin/gateway/payments/<%= p.id %>/credit" class="d-inline" data-confirm="Credit ₹<%= fmt(p.amountPaise) %> to this user's wallet? Only do this after confirming the money reached your bank.">
+            <button class="btn btn-sm btn-success">Credit</button></form>
+        <% } %>
+      </td>
+    </tr>
+  <% }) %>
+  <% if (!payments.length) { %><tr><td colspan="8" class="text-center text-muted py-4">No recharge payments yet</td></tr><% } %>
+  </tbody>
+</table></div></div>
+<%- include('partials/pager') %>
+<%- include('partials/footer') %>

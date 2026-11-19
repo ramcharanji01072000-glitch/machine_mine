@@ -1,7 +1,8 @@
 const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
-const { User, Product, Purchase, Transaction, Bank, Withdrawal, Carousel, Notice, Setting, Admin } = require('../../models');
+const { User, Product, Purchase, Transaction, Bank, Withdrawal, Carousel, Notice, GatewayPayment, Setting, Admin } = require('../../models');
+const youpi = require('../../services/youpi');
 const { requireAdmin, setAdminCookie, ADMIN_COOKIE } = require('../../middleware/auth');
 const { upload, publicPath, removeUpload } = require('../../middleware/upload');
 const { credit, debit } = require('../../services/wallet');
@@ -639,6 +640,101 @@ router.post(
     removeUpload(notice.image);
     await notice.deleteOne();
     go(res, '/admin/notices', 'Notice deleted');
+  })
+);
+
+// ---------- Payment gateway (YouPI) ----------
+const webhookUrlFor = (req) => `${req.protocol}://${req.get('host')}/api/v1/pay/youpi/webhook`;
+const mask = (v) => (v ? `${'•'.repeat(8)}${String(v).slice(-4)}` : '');
+
+router.get(
+  '/gateway',
+  wrap(async (req, res) => {
+    const { page, skip, limit } = paging(req);
+    const s = await Setting.get();
+    const filter = {};
+    if (GatewayPayment.STATUSES.includes(req.query.status)) filter.status = req.query.status;
+    const [payments, total, counts] = await Promise.all([
+      GatewayPayment.find(filter).sort({ id: -1 }).skip(skip).limit(limit),
+      GatewayPayment.countDocuments(filter),
+      GatewayPayment.aggregate([{ $group: { _id: '$status', n: { $sum: 1 } } }]),
+    ]);
+    res.render('admin/gateway', {
+      g: s.youpi || {},
+      masked: { apiKey: mask(s.youpi?.apiKey), webhookSecret: mask(s.youpi?.webhookSecret) },
+      webhookUrl: webhookUrlFor(req),
+      payments,
+      total,
+      page,
+      counts: Object.fromEntries(counts.map((c) => [c._id, c.n])),
+      userMap: await usersById(payments.map((p) => p.userId)),
+    });
+  })
+);
+
+router.post(
+  '/gateway',
+  wrap(async (req, res) => {
+    const s = await Setting.get();
+    const g = s.youpi || {};
+    const baseUrl = str(req.body.baseUrl).replace(/\/+$/, '');
+    if (baseUrl && !/^https?:\/\/[^\s]+$/i.test(baseUrl)) return go(res, '/admin/gateway', 'Gateway URL must start with http:// or https://', true);
+    const minPaise = toPaise(req.body.min);
+    const maxPaise = toPaise(req.body.max);
+    if (!(minPaise > 0) || !(maxPaise >= minPaise)) return go(res, '/admin/gateway', 'Enter a valid minimum and maximum (max ≥ min)', true);
+    s.youpi = {
+      ...(g.toObject ? g.toObject() : g),
+      enabled: req.body.enabled === 'on',
+      baseUrl,
+      merchantId: str(req.body.merchantId).slice(0, 100),
+      // Secrets are write-only: blank keeps the saved value.
+      apiKey: str(req.body.apiKey) ? str(req.body.apiKey).slice(0, 300) : g.apiKey,
+      webhookSecret: str(req.body.webhookSecret) ? str(req.body.webhookSecret).slice(0, 300) : g.webhookSecret,
+      creditOn: req.body.creditOn === 'observed' ? 'observed' : 'reconciled',
+      minPaise,
+      maxPaise,
+    };
+    if (s.youpi.enabled && !youpi.isConfigured(s.youpi)) {
+      s.youpi.enabled = false;
+      await s.save();
+      return go(res, '/admin/gateway', 'Saved, but the gateway stays OFF until URL, merchant ID, API key and webhook secret are all set', true);
+    }
+    await s.save();
+    go(res, '/admin/gateway', 'Gateway settings saved');
+  })
+);
+
+router.post(
+  '/gateway/check',
+  wrap(async (req, res) => {
+    const result = await youpi.checkIntegration(webhookUrlFor(req));
+    go(res, '/admin/gateway#check', result.ok ? 'Integration check passed' : 'Integration check found problems — see below', !result.ok);
+  })
+);
+
+async function loadGatewayPayment(req) {
+  const gp = await GatewayPayment.findOne({ id: Number(req.params.id) });
+  if (!gp) throw new HttpError('Payment not found', 404);
+  return gp;
+}
+
+router.post(
+  '/gateway/payments/:id/refresh',
+  wrap(async (req, res) => {
+    const gp = await youpi.refreshStatus(await loadGatewayPayment(req));
+    go(res, '/admin/gateway', `Payment #${gp.id}: ${gp.status}`);
+  })
+);
+
+// Manual approval (e.g. MANUAL_REVIEW after checking the bank statement). Credits at most once.
+router.post(
+  '/gateway/payments/:id/credit',
+  wrap(async (req, res) => {
+    const gp = await loadGatewayPayment(req);
+    if (gp.creditedAt) return go(res, '/admin/gateway', `Payment #${gp.id} was already credited`, true);
+    const did = await youpi.creditOnce(gp, `admin:${req.admin.username}`);
+    if (did) await GatewayPayment.updateOne({ _id: gp._id }, { $push: { events: { event: 'ADMIN_CREDIT', at: new Date() } } });
+    go(res, '/admin/gateway', did ? `Credited ₹${fmt(gp.amountPaise)} to user #${gp.userId}` : 'Already credited', !did);
   })
 );
 

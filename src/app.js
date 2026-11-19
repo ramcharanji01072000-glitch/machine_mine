@@ -18,7 +18,8 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors());
 if (process.env.NODE_ENV !== 'test') app.use(morgan(config.isProd ? 'combined' : 'dev'));
-app.use(express.json({ limit: '1mb' }));
+// Keep the raw body: payment webhooks are verified by HMAC over the exact bytes received.
+app.use(express.json({ limit: '1mb', verify: (req, res, buf) => { req.rawBody = buf.toString('utf8'); } }));
 app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 app.use(cookieParser());
 app.use('/uploads', express.static(config.uploadDir, { maxAge: '7d', index: false }));
@@ -64,6 +65,7 @@ app.use('/api/v1/nt', nt);
 app.use('/api/v1/dt', dt);
 app.use('/api/v1/am', am);
 app.use('/api/v1/rf', rf);
+app.use('/api/v1/pay', require('./routes/api/payments'));
 app.use('/api', (req, res) => fail(res, 'Route not found', 404));
 
 // Invite links shared from the app look like {baseUrl}/signup/{code}

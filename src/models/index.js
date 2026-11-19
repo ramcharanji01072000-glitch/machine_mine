@@ -7,6 +7,7 @@ module.exports = {
   Withdrawal: require('./Withdrawal'),
   Carousel: require('./Carousel'),
   Notice: require('./Notice'),
+  GatewayPayment: require('./GatewayPayment'),
   Setting: require('./Setting'),
   Admin: require('./Admin'),
 };

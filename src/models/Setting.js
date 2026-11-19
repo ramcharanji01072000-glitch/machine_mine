@@ -21,6 +21,18 @@ const schema = new mongoose.Schema(
     },
     withdrawTaxPercent: { type: Number, default: 0, min: 0, max: 100 }, // legacy single tax, read via withdrawTaxesOf()
     terms: { type: String, default: '' }, // Terms & Conditions shown in the app and at /terms
+    // YouPI payment gateway (self-hosted UPI gateway; we integrate as a merchant).
+    youpi: {
+      enabled: { type: Boolean, default: false },
+      baseUrl: { type: String, default: '' }, // public gateway URL, e.g. https://pay.example.com
+      merchantId: { type: String, default: '' },
+      apiKey: { type: String, default: '' }, // secret: X-Merchant-Key (never shown back in full)
+      webhookSecret: { type: String, default: '' }, // secret: HMAC key for webhooks
+      creditOn: { type: String, enum: ['reconciled', 'observed'], default: 'reconciled' },
+      minPaise: { type: Number, default: 10000 }, // ₹100
+      maxPaise: { type: Number, default: 5000000 }, // ₹50,000
+      lastCheck: { type: mongoose.Schema.Types.Mixed, default: null }, // last "Check integration" result
+    },
     signupBonusPaise: { type: Number, default: 0 },
   },
   { timestamps: true }
